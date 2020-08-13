@@ -23,6 +23,8 @@
 
 ## 2.4 Java BIO 工作机制
 
+![](../_media/chapter02/chapter02_01.png)
+
 对 `BIO` 编程流程的梳理
 
 1. 服务器端启动一个 `ServerSocket`。

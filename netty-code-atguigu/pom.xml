@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.netty.book</groupId>
+        <artifactId>netty-handbook</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+    <groupId>com.netty.code.self</groupId>
+    <artifactId>netty-code-atguigu</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <name>netty-code-atguigu</name>
+    <description>《尚硅谷》Netty 课程代码</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+    </properties>
+
+    <dependencies>
+        
+    </dependencies>
+
+    <build>
+
+    </build>
+
+</project>

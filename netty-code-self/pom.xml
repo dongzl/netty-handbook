@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.netty.book</groupId>
+        <artifactId>netty-handbook</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+    <groupId>com.netty.code.self</groupId>
+    <artifactId>netty-code-self</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <name>netty-code-self</name>
+    <description>Netty自主学习代码</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.github.tonivade</groupId>
+            <artifactId>resp-server</artifactId>
+            <version>0.13.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+
+    </build>
+
+</project>

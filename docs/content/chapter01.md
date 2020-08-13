@@ -47,4 +47,4 @@
 
 ## 1.4 Netty 的学习资料参考
 
-![](https://img10.360buyimg.com/n1/jfs/t5227/173/1793618117/453810/1253bd90/59141c1dN7a93c127.jpg) ![](https://img11.360buyimg.com/n1/jfs/t1516/258/38352851/215555/68f629a5/555080b2Ne6cbf9e3.jpg)
+[![](https://img10.360buyimg.com/n1/jfs/t5227/173/1793618117/453810/1253bd90/59141c1dN7a93c127.jpg)](https://item.jd.com/12070975.html) [![](https://img11.360buyimg.com/n1/jfs/t1516/258/38352851/215555/68f629a5/555080b2Ne6cbf9e3.jpg)](https://item.jd.com/11681556.html)

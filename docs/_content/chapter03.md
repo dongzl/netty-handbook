@@ -210,11 +210,203 @@ public class NIOFileChannel02 {
 2. 拷贝一个文本文件 `1.txt`，放在项目下即可
 3. 代码演示
 
+![](../_media/chapter03/chapter03_09.png)
 
+```java
+package com.atguigu.nio;
+
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+
+public class NIOFileChannel03 {
+
+    public static void main(String[] args) throws Exception {
+
+        FileInputStream fileInputStream = new FileInputStream("1.txt");
+        FileChannel fileChannel01 = fileInputStream.getChannel();
+        FileOutputStream fileOutputStream = new FileOutputStream("2.txt");
+        FileChannel fileChannel02 = fileOutputStream.getChannel();
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(512);
+        
+        while (true) { //循环读取
+
+            //这里有一个重要的操作，一定不要忘了
+            /*
+            public final Buffer clear() {
+                position = 0;
+                limit = capacity;
+                mark = -1;
+                return this;
+            }
+            */
+            byteBuffer.clear(); //清空 buffer
+            int read = fileChannel01.read(byteBuffer);
+            System.out.println("read = " + read);
+            if (read == -1) { //表示读完
+                break;
+            }
+
+            //将 buffer 中的数据写入到 fileChannel02--2.txt
+            byteBuffer.flip();
+            fileChannel02.write(byteBuffer);
+        }
+
+        //关闭相关的流
+        fileInputStream.close();
+        fileOutputStream.close();
+    }
+}
+```
 
 ### 3.6.5 应用实例4 - 拷贝文件 transferFrom 方法
 
+1. 实例要求：
+2. 使用 `FileChannel`（通道）和方法 `transferFrom`，完成文件的拷贝
+3. 拷贝一张图片
+4. 代码演示
+
+```java
+package com.atguigu.nio;
+
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.channels.FileChannel;
+
+public class NIOFileChannel04 {
+
+    public static void main(String[] args) throws Exception {
+
+        //创建相关流
+        FileInputStream fileInputStream = new FileInputStream("d:\\a.jpg");
+        FileOutputStream fileOutputStream = new FileOutputStream("d:\\a2.jpg");
+        
+        //获取各个流对应的 FileChannel
+        FileChannel sourceCh = fileInputStream.getChannel();
+        FileChannel destCh = fileOutputStream.getChannel();
+
+        //使用 transferForm 完成拷贝
+        destCh.transferFrom(sourceCh, 0, sourceCh.size());
+
+        //关闭相关通道和流
+        sourceCh.close();
+        destCh.close();
+        fileInputStream.close();
+        fileOutputStream.close();
+    }
+}
+```
+
 ### 3.6.6 关于 Buffer 和 Channel 的注意事项和细节
+
+1. `ByteBuffer` 支持类型化的 `put` 和 `get`，`put` 放入的是什么数据类型，`get` 就应该使用相应的数据类型来取出，否则可能有 `BufferUnderflowException` 异常。【举例说明】
+
+```java
+package com.atguigu.nio;
+
+import java.nio.ByteBuffer;
+
+public class NIOByteBufferPutGet {
+
+    public static void main(String[] args) {
+        
+        //创建一个 Buffer
+        ByteBuffer buffer = ByteBuffer.allocate(64);
+
+        //类型化方式放入数据
+        buffer.putInt(100);
+        buffer.putLong(9);
+        buffer.putChar('尚');
+        buffer.putShort((short) 4);
+
+        //取出
+        buffer.flip();
+        
+        System.out.println();
+        
+        System.out.println(buffer.getInt());
+        System.out.println(buffer.getLong());
+        System.out.println(buffer.getChar());
+        System.out.println(buffer.getShort());
+    }
+}
+```
+
+2. 可以将一个普通 `Buffer` 转成只读 `Buffer`【举例说明】
+
+```java
+package com.atguigu.nio;
+
+import java.nio.ByteBuffer;
+
+public class ReadOnlyBuffer {
+
+    public static void main(String[] args) {
+
+        //创建一个 buffer
+        ByteBuffer buffer = ByteBuffer.allocate(64);
+
+        for (int i = 0; i < 64; i++) {
+            buffer.put((byte) i);
+        }
+
+        //读取
+        buffer.flip();
+
+        //得到一个只读的 Buffer
+        ByteBuffer readOnlyBuffer = buffer.asReadOnlyBuffer();
+        System.out.println(readOnlyBuffer.getClass());
+
+        //读取
+        while (readOnlyBuffer.hasRemaining()) {
+            System.out.println(readOnlyBuffer.get());
+        }
+
+        readOnlyBuffer.put((byte) 100); //ReadOnlyBufferException
+    }
+}
+```
+
+3. `NIO` 还提供了 `MappedByteBuffer`，可以让文件直接在内存（堆外的内存）中进行修改，而如何同步到文件由 `NIO` 来完成。【举例说明】
+
+```java
+package com.atguigu.nio;
+
+import java.io.RandomAccessFile;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+
+/**
+ * 说明 1.MappedByteBuffer 可让文件直接在内存（堆外内存）修改,操作系统不需要拷贝一次
+ */
+public class MappedByteBufferTest {
+
+    public static void main(String[] args) throws Exception {
+
+        RandomAccessFile randomAccessFile = new RandomAccessFile("1.txt", "rw");
+        //获取对应的通道
+        FileChannel channel = randomAccessFile.getChannel();
+
+        /**
+         * 参数 1:FileChannel.MapMode.READ_WRITE 使用的读写模式
+         * 参数 2：0：可以直接修改的起始位置
+         * 参数 3:5: 是映射到内存的大小（不是索引位置），即将 1.txt 的多少个字节映射到内存
+         * 可以直接修改的范围就是 0-5
+         * 实际类型 DirectByteBuffer
+         */
+        MappedByteBuffer mappedByteBuffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, 5);
+
+        mappedByteBuffer.put(0, (byte) 'H');
+        mappedByteBuffer.put(3, (byte) '9');
+        mappedByteBuffer.put(5, (byte) 'Y');//IndexOutOfBoundsException
+
+        randomAccessFile.close();
+        System.out.println("修改成功~~");
+    }
+}
+```
 
 ## 3.7 Selector（选择器）
 

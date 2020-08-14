@@ -57,7 +57,7 @@ public class BasicBuffer {
 
 <!-- ![](../_media/chapter03/chapter03_01.png)) -->
 
-<img style="height:600px" src="../_media/chapter03/chapter03_01.png" />
+<img style="height:600px" src="_media/chapter03/chapter03_01.png" />
 
 1. 每个 `Channel` 都会对应一个 `Buffer`。
 2. `Selector` 对应一个线程，一个线程对应多个 `Channel`（连接）。
@@ -79,7 +79,7 @@ public class BasicBuffer {
 
 1. 在 `NIO` 中，`Buffer` 是一个顶层父类，它是一个抽象类，类的层级关系图：
 
-<img style="height:400px" src="../_media/chapter03/chapter03_03.png" /> <img style="height:300px" src="../_media/chapter03/chapter03_04.png" />
+<img style="height:400px" src="_media/chapter03/chapter03_03.png" /> <img style="height:300px" src="_media/chapter03/chapter03_04.png" />
 
 2. `Buffer` 类定义了所有的缓冲区都具有的四个属性来提供关于其所包含的数据元素的信息：
 

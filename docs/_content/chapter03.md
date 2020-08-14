@@ -1,15 +1,45 @@
 ## 3.1 Java NIO 基本介绍
 
-1. `Java NIO` 全称 `Java non-blocking IO`，是指 `JDK` 提供的新 `API`。从 `JDK1.4` 开始，`Java` 提供了一系列改进的输入/输出的新特性，被统称为 `NIO`（即 `NewIO`），是同步非阻塞的。
-2. `NIO` 相关类都被放在 `java.nio` 包及子包下，并且对原 `java.io` 包中的很多类进行改写。【基本案例】
-3. `NIO` 有三大核心部分：`Channel`（通道）、`Buffer`（缓冲区）、`Selector`（选择器）
-4. `NIO` 是面向缓冲区，或者面向块编程的。数据读取到一个它稍后处理的缓冲区，需要时可在缓冲区中前后移动，这就增加了处理过程中的灵活性，使用它可以提供非阻塞式的高伸缩性网络。
+1. `Java NIO` 全称 **`Java non-blocking IO`**，是指 `JDK` 提供的新 `API`。从 `JDK1.4` 开始，`Java` 提供了一系列改进的输入/输出的新特性，被统称为 `NIO`（即 `NewIO`），是同步非阻塞的。
+2. `NIO` 相关类都被放在 **`java.nio`** 包及子包下，并且对原 `java.io` 包中的很多类进行改写。【基本案例】
+3. `NIO` 有三大核心部分：**`Channel`（通道）、`Buffer`（缓冲区）、`Selector`（选择器）**。
+4. `NIO` 是**面向缓冲区，或者面向块编程**的。数据读取到一个它稍后处理的缓冲区，需要时可在缓冲区中前后移动，这就增加了处理过程中的灵活性，使用它可以提供非阻塞式的高伸缩性网络。
 5. `Java NIO` 的非阻塞模式，使一个线程从某通道发送请求或者读取数据，但是它仅能得到目前可用的数据，如果目前没有数据可用时，就什么都不会获取，而不是保持线程阻塞，所以直至数据变的可以读取之前，该线程可以继续做其他的事情。非阻塞写也是如此，一个线程请求写入一些数据到某通道，但不需要等待它完全写入，这个线程同时可以去做别的事情。【后面有案例说明】
 6. 通俗理解：`NIO` 是可以做到用一个线程来处理多个操作的。假设有 `10000` 个请求过来,根据实际情况，可以分配 `50` 或者 `100` 个线程来处理。不像之前的阻塞 `IO` 那样，非得分配 `10000` 个。
 7. `HTTP 2.0` 使用了多路复用的技术，做到同一个连接并发处理多个请求，而且并发请求的数量比 `HTTP 1.1` 大了好几个数量级。
 8. 案例说明 `NIO` 的 `Buffer`
 
+```java
+package com.atguigu.nio;
 
+import java.nio.IntBuffer;
+
+public class BasicBuffer {
+
+    public static void main(String[] args) {
+
+        //举例说明 Buffer 的使用(简单说明)
+        //创建一个 Buffer，大小为 5，即可以存放 5 个 int
+        IntBuffer intBuffer = IntBuffer.allocate(5);
+
+        //向buffer存放数据
+        //intBuffer.put(10);
+        //intBuffer.put(11);
+        //intBuffer.put(12);
+        //intBuffer.put(13);
+        //intBuffer.put(14);
+        for (int i = 0; i < intBuffer.capacity(); i++) {
+            intBuffer.put(i * 2);
+        }
+        //如何从 buffer 读取数据
+        //将 buffer 转换，读写切换(!!!)
+        intBuffer.flip();
+        while (intBuffer.hasRemaining()) {
+            System.out.println(intBuffer.get());
+        }
+    }
+}
+```
 
 ## 3.2 NIO 和 BIO 的比较
 
@@ -25,6 +55,9 @@
 
 关系图的说明:
 
+<!-- ![](../_media/chapter03/chapter03_01.png)) -->
+
+<img style="height:600px" src="_media/chapter03/chapter03_01.png" />
 
 1. 每个 `Channel` 都会对应一个 `Buffer`。
 2. `Selector` 对应一个线程，一个线程对应多个 `Channel`（连接）。
@@ -39,6 +72,8 @@
 ### 3.4.1 基本介绍
 
 缓冲区（`Buffer`）：缓冲区本质上是一个**可以读写数据的内存块**，可以理解成是一个**容器对象（含数组）**，该对象提供了一组方法，可以更轻松地使用内存块，，缓冲区对象内置了一些机制，能够跟踪和记录缓冲区的状态变化情况。`Channel` 提供从文件、网络读取数据的渠道，但是读取或写入的数据都必须经由 `Buffer`，如图:【后面举例说明】
+
+![](../_media/chapter03/chapter03_02.png)
 
 ### 3.4.2 Buffer 类及其子类
 

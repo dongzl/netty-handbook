@@ -124,7 +124,7 @@ public class BasicBuffer {
 
 实例要求：
 
-1. 使用前面学习后的 ByteBuffer（缓冲）和 FileChannel（通道），将 "hello,尚硅谷" 写入到 file01.txt 中
+1. 使用前面学习后的 `ByteBuffer`（缓冲）和 `FileChannel`（通道），将 "hello,尚硅谷" 写入到 `file01.txt` 中
 2. 文件不存在就创建
 3. 代码演示
 
@@ -166,7 +166,7 @@ public class NIOFileChannel01 {
 
 实例要求：
 
-1. 使用前面学习后的 ByteBuffer（缓冲）和 FileChannel（通道），将 file01.txt 中的数据读入到程序，并显示在控制台屏幕
+1. 使用前面学习后的 `ByteBuffer`（缓冲）和 `FileChannel`（通道），将 `file01.txt` 中的数据读入到程序，并显示在控制台屏幕
 2. 假定文件已经存在
 3. 代码演示
 
@@ -206,8 +206,8 @@ public class NIOFileChannel02 {
 
 实例要求：
 
-1. 使用 FileChannel（通道）和方法 read、write，完成文件的拷贝
-2. 拷贝一个文本文件 1.txt，放在项目下即可
+1. 使用 `FileChannel`（通道）和方法 `read、write`，完成文件的拷贝
+2. 拷贝一个文本文件 `1.txt`，放在项目下即可
 3. 代码演示
 
 

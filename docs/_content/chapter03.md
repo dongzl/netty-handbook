@@ -57,7 +57,7 @@ public class BasicBuffer {
 
 <!-- ![](../_media/chapter03/chapter03_01.png)) -->
 
-<img style="height:600px" src="_media/chapter03/chapter03_01.png" />
+<img style="height:600px" src="../_media/chapter03/chapter03_01.png" />
 
 1. 每个 `Channel` 都会对应一个 `Buffer`。
 2. `Selector` 对应一个线程，一个线程对应多个 `Channel`（连接）。
@@ -79,15 +79,21 @@ public class BasicBuffer {
 
 1. 在 `NIO` 中，`Buffer` 是一个顶层父类，它是一个抽象类，类的层级关系图：
 
+<img style="height:400px" src="../_media/chapter03/chapter03_03.png" /> <img style="height:300px" src="../_media/chapter03/chapter03_04.png" />
+
 2. `Buffer` 类定义了所有的缓冲区都具有的四个属性来提供关于其所包含的数据元素的信息：
 
+![](../_media/chapter03/chapter03_05.png)
+
 3. `Buffer` 类相关方法一览
+
+![](../_media/chapter03/chapter03_06.png)
 
 ### 3.4.3 ByteBuffer
 
 从前面可以看出对于 `Java` 中的基本数据类型（`boolean` 除外），都有一个 `Buffer` 类型与之相对应，最常用的自然是 `ByteBuffer` 类（二进制数据），该类的主要方法如下：
 
-
+![](../_media/chapter03/chapter03_07.png)
 
 ## 3.5 通道（Channel）
 
@@ -99,18 +105,112 @@ public class BasicBuffer {
    - 通道可以从缓冲读数据，也可以写数据到缓冲:
 2. `BIO` 中的 `Stream` 是单向的，例如 `FileInputStream` 对象只能进行读取数据的操作，而 `NIO` 中的通道（`Channel`）是双向的，可以读操作，也可以写操作。
 3. `Channel` 在 `NIO` 中是一个接口 `public interface Channel extends Closeable{}`
-4. 常用的 `Channel` 类有：`FileChannel`、`DatagramChannel`、`ServerSocketChannel` 和 `SocketChannel`。【`ServerSocketChanne` 类似 `ServerSocket`、`SocketChannel` 类似 `Socket`】
+4. 常用的 `Channel` 类有：**`FileChannel`、`DatagramChannel`、`ServerSocketChannel` 和 `SocketChannel`**。【`ServerSocketChanne` 类似 `ServerSocket`、`SocketChannel` 类似 `Socket`】
 5. `FileChannel` 用于文件的数据读写，`DatagramChannel` 用于 `UDP` 的数据读写，`ServerSocketChannel` 和 `SocketChannel` 用于 `TCP` 的数据读写。
 6. 图示
 
+![](../_media/chapter03/chapter03_08.png)
 
 ### 3.6.1 FileChannel 类
 
+`FileChannel` 主要用来对本地文件进行 `IO` 操作，常见的方法有
+
+- `public int read(ByteBuffer dst)`，从通道读取数据并放到缓冲区中
+- `public int write(ByteBuffer src)`，把缓冲区的数据写到通道中
+- `public long transferFrom(ReadableByteChannel src, long position, long count)`，从目标通道中复制数据到当前通道
+- `public long transferTo(long position, long count, WritableByteChannel target)`，把数据从当前通道复制给目标通道
+
 ### 3.6.2 应用实例1 - 本地文件写数据
+
+实例要求：
+
+1. 使用前面学习后的 ByteBuffer（缓冲）和 FileChannel（通道），将 "hello,尚硅谷" 写入到 file01.txt 中
+2. 文件不存在就创建
+3. 代码演示
+
+```java
+package com.atguigu.nio;
+
+import java.io.FileOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+
+public class NIOFileChannel01 {
+
+    public static void main(String[] args) throws Exception {
+        String str = "hello,尚硅谷";
+        //创建一个输出流->channel
+        FileOutputStream fileOutputStream = new FileOutputStream("d:\\file01.txt");
+
+        //通过 fileOutputStream 获取对应的 FileChannel
+        //这个 fileChannel 真实类型是 FileChannelImpl
+        FileChannel fileChannel = fileOutputStream.getChannel();
+
+        //创建一个缓冲区ByteBuffer
+        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+
+        //将str放入byteBuffer
+        byteBuffer.put(str.getBytes());
+
+        //对byteBuffer进行flip
+        byteBuffer.flip();
+
+        //将 byteBuffer 数据写入到 fileChannel
+        fileChannel.write(byteBuffer);
+        fileOutputStream.close();
+    }
+}
+```
 
 ### 3.6.3 应用实例2 - 本地文件读数据
 
+实例要求：
+
+1. 使用前面学习后的 ByteBuffer（缓冲）和 FileChannel（通道），将 file01.txt 中的数据读入到程序，并显示在控制台屏幕
+2. 假定文件已经存在
+3. 代码演示
+
+```java
+package com.atguigu.nio;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+
+public class NIOFileChannel02 {
+
+    public static void main(String[] args) throws Exception {
+
+        //创建文件的输入流
+        File file = new File("d:\\file01.txt");
+        FileInputStream fileInputStream = new FileInputStream(file);
+        
+        //通过 fileInputStream 获取对应的 FileChannel -> 实际类型 FileChannelImpl
+        FileChannel fileChannel = fileInputStream.getChannel();
+        
+        //创建缓冲区
+        ByteBuffer byteBuffer = ByteBuffer.allocate((int)file.length());
+        
+        //将通道的数据读入到 Buffer
+        fileChannel.read(byteBuffer);
+        
+        //将 byteBuffer 的字节数据转成 String
+        System.out.println(new String(byteBuffer.array()));
+        fileInputStream.close();
+    }
+}
+```
+
 ### 3.6.4 应用实例3 - 使用一个 Buffer 完成文件读取、写入
+
+实例要求：
+
+1. 使用 FileChannel（通道）和方法 read、write，完成文件的拷贝
+2. 拷贝一个文本文件 1.txt，放在项目下即可
+3. 代码演示
+
+
 
 ### 3.6.5 应用实例4 - 拷贝文件 transferFrom 方法
 

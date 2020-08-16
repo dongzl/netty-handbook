@@ -125,7 +125,7 @@
 
 ### 5.6.3 Scalable IO in Java 对 Multiple Reactors 的原理图解：
 
-![](../_media/chapter05/chapter06_07.png)
+![](../_media/chapter05/chapter05_07.png)
 
 ### 5.6.4 方案优缺点说明
 
@@ -155,7 +155,7 @@
 
 `Netty` 主要基于主从 `Reactors` 多线程模型（如图）做了一定的改进，其中主从 `Reactor` 多线程模型有多个 `Reactor`
 
-![](../_media/chapter05/chapter06_08.png)
+![](../_media/chapter05/chapter05_08.png)
 
 ### 5.8.2 对上图说明
 
@@ -165,11 +165,11 @@
 
 ### 5.8.3 工作原理示意图2 - 进阶版
 
-![](../_media/chapter05/chapter06_09.png)
+![](../_media/chapter05/chapter05_09.png)
 
 ### 5.8.4 工作原理示意图 - 详细版
 
-![](../_media/chapter05/chapter06_10.png)
+![](../_media/chapter05/chapter05_10.png)
 
 ### 5.8.5 对上图的说明小结
 
@@ -203,16 +203,65 @@
 
 ### 5.8.7 任务队列中的 Task 有 3 种典型使用场景
 
+1. 用户程序自定义的普通任务【举例说明】
+2. 用户自定义定时任务
+3. 非当前 `Reactor` 线程调用 `Channel` 的各种方法
+   例如在推送系统的业务线程里面，根据用户的标识，找到对应的 `Channel` 引用，然后调用 `Write` 类方法向该用户推送消息，就会进入到这种场景。最终的 `Write` 会提交到任务队列中后被异步消费
+4. 代码演示
+
 ### 5.8.8 方案再说明
+
+1. `Netty` 抽象出两组线程池，`BossGroup` 专门负责接收客户端连接，`WorkerGroup` 专门负责网络读写操作。
+2. `NioEventLoop` 表示一个不断循环执行处理任务的线程，每个 `NioEventLoop` 都有一个 `Selector`，用于监听绑定在其上的 `socket`网络通道。
+3. `NioEventLoop` 内部采用串行化设计，从消息的 **读取->解码->处理->编码->发送**，始终由 `IO` 线程 `NioEventLoop` 负责
+
+`NioEventLoopGroup` 下包含多个 `NioEventLoop`
+- 每个 `NioEventLoop` 中包含有一个 `Selector`，一个 `taskQueue`
+- 每个 `NioEventLoop` 的 `Selector` 上可以注册监听多个 `NioChannel`
+- 每个 `NioChannel` 只会绑定在唯一的 `NioEventLoop` 上
+- 每个 `NioChannel` 都绑定有一个自己的 `ChannelPipeline`
 
 ## 5.9 异步模型
 
 ### 5.9.1 基本介绍
 
+1. 异步的概念和同步相对。当一个异步过程调用发出后，调用者不能立刻得到结果。实际处理这个调用的组件在完成后，通过状态、通知和回调来通知调用者。
+2. `Netty` 中的 `I/O` 操作是异步的，包括 `Bind、Write、Connect` 等操作会简单的返回一个 `ChannelFuture`。
+3. 调用者并不能立刻获得结果，而是通过 `Future-Listener` 机制，用户可以方便的主动获取或者通过通知机制获得 `IO` 操作结果。
+4. `Netty` 的异步模型是建立在 `future` 和 `callback` 的之上的。`callback` 就是回调。重点说 `Future`，它的核心思想是：假设一个方法 `fun`，计算过程可能非常耗时，等待 `fun` 返回显然不合适。那么可以在调用 `fun` 的时候，立马返回一个 `Future`，后续可以通过 `Future` 去监控方法 `fun` 的处理过程（即：`Future-Listener` 机制）
+
 ### 5.9.2 Future 说明
+
+1. 表示异步的执行结果,可以通过它提供的方法来检测执行是否完成，比如检索计算等等。
+2. `ChannelFuture` 是一个接口：`public interface ChannelFuture extends Future<Void>` 我们可以添加监听器，当监听的事件发生时，就会通知到监听器。案例说明
 
 ### 5.9.3 工作原理示意图
 
+![](../_media/chapter05/chapter05_11.png)
+
+![](../_media/chapter05/chapter05_12.png)
+
+说明：
+1. 在使用 `Netty` 进行编程时，拦截操作和转换出入站数据只需要您提供 `callback` 或利用 `future` 即可。这使得链式操作简单、高效，并有利于编写可重用的、通用的代码。
+2. `Netty` 框架的目标就是让你的业务逻辑从网络基础应用编码中分离出来、解脱出来。
+
 ### 5.9.4 Future-Listener 机制
 
+1. 当 `Future` 对象刚刚创建时，处于非完成状态，调用者可以通过返回的 `ChannelFuture` 来获取操作执行的状态，注册监听函数来执行完成后的操作。
+2. 常见有如下操作
+   - 通过 `isDone` 方法来判断当前操作是否完成；
+   - 通过 `isSuccess` 方法来判断已完成的当前操作是否成功；
+   - 通过 `getCause` 方法来获取已完成的当前操作失败的原因；
+   - 通过 `isCancelled` 方法来判断已完成的当前操作是否被取消；
+   - 通过 `addListener` 方法来注册监听器，当操作已完成（`isDone`方法返回完成），将会通知指定的监听器；如果 `Future` 对象已完成，则通知指定的监听器
+
+举例说明
+演示：绑定端口是异步操作，当绑定操作处理完，将会调用相应的监听器处理逻辑
+
 ## 5.10 快速入门实例 - HTTP服务
+
+1. 实例要求：使用 `IDEA` 创建 `Netty` 项目
+2. `Netty` 服务器在 `6668` 端口监听，浏览器发出请求 `http://localhost:6668/` 
+3. 服务器可以回复消息给客户端"Hello!我是服务器5",并对特定请求资源进行过滤。
+4. 目的：`Netty` 可以做 `Http` 服务开发，并且理解 `Handler` 实例和客户端及其请求的关系。
+5. 看老师代码演示

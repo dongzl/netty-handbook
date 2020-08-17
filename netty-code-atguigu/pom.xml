@@ -18,7 +18,12 @@
     </properties>
 
     <dependencies>
-        
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId> <!-- Use 'netty-all' for 4.0 or above -->
+            <version>4.1.51.Final</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <build>

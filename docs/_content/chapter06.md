@@ -39,7 +39,7 @@ Netty 中所有的 IO 操作都是异步的，不能立刻得知消息是否被�
 1. Netty 基于 Selector 对象实现 I/O 多路复用，通过 Selector 一个线程可以监听多个连接的 Channel 事件。
 2. 当向一个 Selector 中注册 Channel 后，Selector 内部的机制就可以自动不断地查询（Select）这些注册的 Channel 是否有已就绪的 I/O 事件（例如可读，可写，网络连接完成等），这样程序就可以很简单地使用一个线程高效地管理多个 Channel
 
-6.5 ChannelHandler 及其实现类
+## 6.5 ChannelHandler 及其实现类
 
 1. ChannelHandler 是一个接口，处理 I/O 事件或拦截 I/O 操作，并将其转发到其 ChannelPipeline（业务处理链）中的下一个处理程序。
 2. ChannelHandler 本身并没有提供很多方法，因为这个接口有许多的方法需要实现，方便使用期间，可以继承它的子类
@@ -50,3 +50,60 @@ Netty 中所有的 IO 操作都是异步的，不能立刻得知消息是否被�
 4. 我们经常需要自定义一个 Handler 类去继承 ChannelInboundHandlerAdapter，然后通过重写相应方法实现业务逻辑，我们接下来看看一般都需要重写哪些方法
 
 ![](../_media/chapter06/chapter06_02.png)
+
+## 6.6 Pipeline 和 ChannelPipeline
+
+ChannelPipeline 是一个重点：
+
+1. ChannelPipeline 是一个 Handler 的集合，它负责处理和拦截 inbound 或者 outbound 的事件和操作，相当于一个贯穿 Netty的链。（也可以这样理解：ChannelPipeline 是保存 ChannelHandler 的 List，用于处理或拦截 Channel 的入站事件和出站操作）
+2. ChannelPipeline 实现了一种高级形式的拦截过滤器模式，使用户可以完全控制事件的处理方式，以及 Channel 中各个的 ChannelHandler 如何相互交互
+3. 在 Netty 中每个 Channel 都有且仅有一个 ChannelPipeline 与之对应，它们的组成关系如下
+
+![](../_media/chapter06/chapter06_03.png)
+
+![](../_media/chapter06/chapter06_04.png)
+
+4. 常用方法
+   ChannelPipeline addFirst(ChannelHandler... handlers)，把一个业务处理类（handler）添加到链中的第一个位置ChannelPipeline addLast(ChannelHandler... handlers)，把一个业务处理类（handler）添加到链中的最后一个位置
+
+## 6.7 ChannelHandlerContext
+
+1. 保存 Channel 相关的所有上下文信息，同时关联一个 ChannelHandler 对象
+2. 即 ChannelHandlerContext 中包含一个具体的事件处理器 ChannelHandler，同时 ChannelHandlerContext 中也绑定了对应的 pipeline 和 Channel 的信息，方便对 ChannelHandler 进行调用。
+3. 常用方法
+   - ChannelFuture close()，关闭通道
+   - ChannelOutboundInvoker flush()，刷新
+   - ChannelFuture writeAndFlush(Object msg)，将数据写到 
+   - ChannelPipeline 中当前 ChannelHandler 的下一个 ChannelHandler 开始处理（出站）
+
+![](../_media/chapter06/chapter06_05.png)
+
+## 6.8 ChannelOption
+
+1. Netty 在创建 Channel 实例后，一般都需要设置 ChannelOption 参数。
+2. ChannelOption 参数如下：
+
+![](../_media/chapter06/chapter06_06.png)
+
+## 6.9 EventLoopGroup 和其实现类 NioEventLoopGroup
+
+1. EventLoopGroup 是一组 EventLoop 的抽象，Netty 为了更好的利用多核 CPU 资源，一般会有多个 EventLoop 同时工作，每个 EventLoop 维护着一个 Selector 实例。
+2. EventLoopGroup 提供 next 接口，可以从组里面按照一定规则获取其中一个 EventLoop 来处理任务。在 Netty 服务器端编程中，我们一般都需要提供两个 EventLoopGroup，例如：BossEventLoopGroup 和 WorkerEventLoopGroup。
+3. 通常一个服务端口即一个 ServerSocketChannel 对应一个 Selector 和一个 EventLoop 线程。BossEventLoop 负责接收客户端的连接并将 SocketChannel 交给 WorkerEventLoopGroup 来进行 IO 处理，如下图所示
+
+![](../_media/chapter06/chapter06_07.png)
+
+4. 常用方法
+   public NioEventLoopGroup()，构造方法
+   public Future<?> shutdownGracefully()，断开连接，关闭线程
+
+## 6.10 Unpooled 类
+
+1. Netty 提供一个专门用来操作缓冲区（即 Netty 的数据容器）的工具类
+2. 常用方法如下所示
+
+![](../_media/chapter06/chapter06_08.png)
+
+3. 举例说明 Unpooled 获取 Netty 的数据容器 ByteBuf 的基本使用【案例演示】
+
+![](../_media/chapter06/chapter06_09.png)

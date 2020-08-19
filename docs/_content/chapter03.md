@@ -536,10 +536,10 @@ public class ScatteringAndGatheringTest {
 ## 3.10 SelectionKey
 
 1. `SelectionKey`，表示 `Selector` 和网络通道的注册关系，共四种：
-   `intOP_ACCEPT`：有新的网络连接可以 `accept`，值为 `16`
-   `intOP_CONNECT`：代表连接已经建立，值为 `8`
-   `intOP_READ`：代表读操作，值为 `1`
-   `intOP_WRITE`：代表写操作，值为 `4`
+   - `int OP_ACCEPT`：有新的网络连接可以 `accept`，值为 `16`
+   - `int OP_CONNECT`：代表连接已经建立，值为 `8`
+   - `int OP_READ`：代表读操作，值为 `1`
+   - `int OP_WRITE`：代表写操作，值为 `4`
 
 源码中：
 

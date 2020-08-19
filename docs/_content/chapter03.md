@@ -735,11 +735,6 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Scanner;
 
-/**
- * @author dongzonglei
- * @description
- * @date 2020/8/15 上午8:53
- */
 public class GroupChatClient {
 
     //定义相关的属性
@@ -843,7 +838,16 @@ public class GroupChatClient {
 
 `Java` 传统 `IO` 和网络编程的一段代码
 
-![](../_media/chapter03/chapter03_16.png)
+```java
+File file = new File("test.txt");
+RandomAccessFile raf = new RandomAccessFile(file, "rw");
+
+byte[] arr = new byte[(int) file.length()];
+raf.read(arr);
+
+Socket socket = new ServerSocket(8080).accept();
+socket.getOutputStream().write(arr);
+```
 
 ### 3.14.3 传统 IO 模型
 
@@ -971,4 +975,15 @@ public class NewIOClient {
 
 ## 3.16 BIO、NIO、AIO 对比表
 
-![](../_media/chapter03/chapter03_21.png)
+|       | BIO     | NIO               | AIO      |
+|:-----:| :-----: | :---------------: | :------: |
+|IO模型  | 同步阻塞 | 同步非阻塞（多路复用）| 异步非阻塞 |
+|编程难道| 简单     | 复杂               | 复杂      |
+|可靠性  | 差      | 好                 | 好        |
+|吞吐量  | 低      | 高                 | 高        |
+
+**举例说明** 
+
+1. 同步阻塞：到理发店理发，就一直等理发师，直到轮到自己理发。
+2. 同步非阻塞：到理发店理发，发现前面有其它人理发，给理发师说下，先干其他事情，一会过来看是否轮到自己.
+3. 异步非阻塞：给理发师打电话，让理发师上门服务，自己干其它事情，理发师自己来家给你理发

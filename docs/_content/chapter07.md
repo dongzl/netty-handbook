@@ -21,7 +21,7 @@
 
 1. `Protobuf` 基本介绍和使用示意图
 2. `Protobuf` 是 `Google` 发布的开源项目，全称 `Google Protocol Buffers`，是一种轻便高效的结构化数据存储格式，可以用于结构化数据串行化，或者说序列化。它很适合做数据存储或 `RPC` [远程过程调用 `remote procedure call` ]数据交换格式。目前很多公司 `http + json tcp + protobuf`
-3. 参考文档:https://developers.google.com/protocol-buffers/docs/proto 语言指南
+3. 参考文档：https://developers.google.com/protocol-buffers/docs/proto 语言指南
 4. `Protobuf` 是以 `message` 的方式来管理数据的.
 5. 支持跨平台、跨语言，即[客户端和服务器端可以是不同的语言编写的]（支持目前绝大多数语言，例如 `C++`、`C#`、`Java`、`python` 等）
 6. 高性能，高可靠性

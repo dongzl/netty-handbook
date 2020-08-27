@@ -538,26 +538,56 @@ private static void doBind0(
     });
 }
 ```
+
 说明：
 
 1)该方法的参数为 initAndRegister 的 future，NioServerSocketChannel，端口地址，NioServerSocketChannel 的 promise
 2)这里就可以根据前面下的断点，一直 debug:
 
+将调用LoggingHandler的invokeBind方法,最后会追到//DefaultChannelPipeline类的bind//然后进入到unsafe.bind方法debug,注意要追踪到//unsafe.bind,要debug第二圈的时候，才能看到.
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```java
+@Override
+public void bind (ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) throws Exception {
+    unsafe.bind(localAddress,promise);
+}
 
-将调用LoggingHandler的invokeBind方法,最后会追到//DefaultChannelPipeline类的bind//然后进入到unsafe.bind方法debug,注意要追踪到//unsafe.bind,要debug第二圈的时候，才能看到.@Overridepublicvoidbind(ChannelHandlerContextctx,SocketAddresslocalAddress,ChannelPromisepromise)throwsException{
+继续追踪cAbstractChannel 的 
 
-unsafe.bind(localAddress,promise);}继续追踪AbstractChannel的publicfinalvoidbind(finalSocketAddresslocalAddress,finalChannelPromisepromise){//....try{//!!!!小红旗可以看到，这里最终的方法就是doBind方法，执行成功后，执行通道的fireChannelActive方法，告诉所有的handler，已经成功绑定。doBind(localAddress);//}catch(Throwablet){safeSetFailure(promise,t);closeIfClosed();return;}}
+public final void bind (final SocketAddress localAddress, final ChannelPromise promise) {
+    //....
+    try{//!!!!小红旗可以看到，这里最终的方法就是doBind方法，执行成功后，执行通道的fireChannelActive方法，告诉所有的handler，已经成功绑定。
+    doBind(localAddress);
+    //
+    } catch (Throwable t) {
+        safeSetFailure(promise, t);
+        closeIfClosed();return;
+    }
+}
+```
 
 3)最终doBind就会追踪到NioServerSocketChannel的doBind,说明Netty底层使用的是Nio
 
-@OverrideprotectedvoiddoBind(SocketAddresslocalAddress)throwsException{if(PlatformDependent.javaVersion()>=7){javaChannel().bind(localAddress,config.getBacklog());}else{javaChannel().socket().bind(localAddress,config.getBacklog());}}
+```java
+@Override
+protected void doBind (SocketAddress localAddress) throws Exception {
+    if (PlatformDependent.javaVersion() >= 7) {
+        javaChannel().bind(localAddress, config.getBacklog());
+    } else {
+        javaChannel().socket().bind(localAddress, config.getBacklog());
+    }
+}
+```
 
+4.7回到bind方法(alt+v)，最后一步：safeSetSuccess(promise)，告诉promise任务成功了。其可以执行监听器的方法了。到此整个启动过程已经结束了，ok了5.继续atl+V服务器就回进入到(NioEventLoop类)一个循环代码，进行监听
 
-4.7回到bind方法(alt+v)，最后一步：safeSetSuccess(promise)，告诉promise任务成功了。其可以执行监听器的方法了。到此整个启动过程已经结束了，ok了5.继续atl+V服务器就回进入到(NioEventLoop类)一个循环代码，进行监听@Overrideprotectedvoidrun(){for(;;){try{}
-
-
+```java
+@Override
+protected void run() {
+    for(;;) {
+        try{
+            
+        }
 ```
 
 

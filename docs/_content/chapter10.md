@@ -532,8 +532,8 @@ private static void doBind0(
 
 说明：
 
-1)该方法的参数为 initAndRegister 的 future，NioServerSocketChannel，端口地址，NioServerSocketChannel 的 promise
-2)这里就可以根据前面下的断点，一直 debug:
+1. 该方法的参数为 initAndRegister 的 future，NioServerSocketChannel，端口地址，NioServerSocketChannel 的 promise
+2. 这里就可以根据前面下的断点，一直 debug:
 
 将调用LoggingHandler的invokeBind方法,最后会追到//DefaultChannelPipeline类的bind//然后进入到unsafe.bind方法debug,注意要追踪到//unsafe.bind,要debug第二圈的时候，才能看到.
 

@@ -1463,23 +1463,24 @@ if(!reading) {
 
 源码剖析
 
-1.EventLoop介绍1.1首先看看NioEventLoop的继承图
+1.`EventLoop`介绍
+1.1首先看看 `NioEventLoop` 的继承图
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 说明重点：
-1)ScheduledExecutorService 接口表示是一个定时任务接口，EventLoop 可以接受定时任务。
-2)EventLoop 接口：Netty 接口文档说明该接口作用：一旦 Channel 注册了，就处理该 Channel 对应的所有 I/O 操作。
-3)SingleThreadEventExecutor 表示这是一个单个线程的线程池
-4)EventLoop 是一个单例的线程池，里面含有一个死循环的线程不断的做着 3 件事情：监听端口，处理端口事件，处理队列事件。每个 EventLoop 都可以绑定多个 Channel，而每个 Channel 始终只能由一个 EventLoop 来处理
+1)`ScheduledExecutorService` 接口表示是一个定时任务接口，`EventLoop` 可以接受定时任务。
+2)`EventLoop` 接口：`Netty` 接口文档说明该接口作用：一旦 `Channel` 注册了，就处理该 `Channel` 对应的所有 `I/O` 操作。
+3)`SingleThreadEventExecutor` 表示这是一个单个线程的线程池
+4)`EventLoop` 是一个单例的线程池，里面含有一个死循环的线程不断的做着 `3` 件事情：监听端口，处理端口事件，处理队列事件。每个 `EventLoop` 都可以绑定多个 `Channel`，而每个 `Channel` 始终只能由一个 `EventLoop` 来处理
 
-2.NioEventLoop 的使用 - execute方法
+2. `NioEventLoop` 的使用 - `execute` 方法
 
-2.1execute 源码剖析
+2.1 `execute` 源码剖析
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-在 EventLoop 的使用，一般就是 eventloop.execute(task); 看下 execute 方法的实现(在 SingleThreadEventExecutor 类中)
+在 `EventLoop` 的使用，一般就是 `eventloop.execute(task);` 看下 `execute` 方法的实现(在 `SingleThreadEventExecutor` 类中)
 
 ```java
 @Override
@@ -1505,10 +1506,12 @@ public void execute(Runnable task) {
 ```
 
 说明:
-1)首先判断该 EventLoop 的线程是否是当前线程，如果是，直接添加到任务队列中去，如果不是，则尝试启动线程（但由于线程是单个的，因此只能启动一次），随后再将任务添加到队列中去。
-2)如果线程已经停止，并且删除任务失败，则执行拒绝策略，默认是抛出异常。3)如果addTaskWakesUp是false，并且任务不是NonWakeupRunnable类型的，就尝试唤醒selector。这个时候，阻塞在selecor的线程就会立即返回4)可以下断点来追踪
+1)首先判断该 `EventLoop` 的线程是否是当前线程，如果是，直接添加到任务队列中去，如果不是，则尝试启动线程（但由于线程是单个的，因此只能启动一次），随后再将任务添加到队列中去。
+2)如果线程已经停止，并且删除任务失败，则执行拒绝策略，默认是抛出异常。
+3)如果 `addTaskWakesUp` 是 `false`，并且任务不是 `NonWakeupRunnable` 类型的，就尝试唤醒 `selector`。这个时候，阻塞在 `selecor`的线程就会立即返回
+4)可以下断点来追踪
 
-2.2我们 debugaddTask 和 offerTask 方法源码
+2.2我们 `debugaddTask` 和 `offerTask` 方法源码
 
 ```java
 protected void addTask(Runnable task) {
@@ -1529,8 +1532,8 @@ final boolean offerTask(Runnable task) {
 }
 ```
 
-3.NioEventLoop 的父类 SingleThreadEventExecutor 的 startThread 方法
-3.1当执行 execute 方法的时候，如果当前线程不是 EventLoop 所属线程，则尝试启动线程，也就是 startThread 方法，dubug 代码如下：
+3.`NioEventLoop` 的父类 `SingleThreadEventExecutor` 的 `startThread` 方法
+3.1当执行 `execute` 方法的时候，如果当前线程不是 `EventLoop` 所属线程，则尝试启动线程，也就是 `startThread` 方法，dubug 代码如下：
 
 ```java
 private void startThread() {
@@ -1547,9 +1550,9 @@ private void startThread() {
 }
 ```
 
-说明:该方法首先判断是否启动过了，保证 EventLoop 只有一个线程，如果没有启动过，则尝试使用 Cas 将 state 状态改为 ST_STARTED，也就是已启动。然后调用 doStartThread 方法。如果失败，则进行回滚
+说明:该方法首先判断是否启动过了，保证 `EventLoop` 只有一个线程，如果没有启动过，则尝试使用 `Cas` 将 `state` 状态改为 `ST_STARTED`，也就是已启动。然后调用 `doStartThread` 方法。如果失败，则进行回滚
 
-看下 doStartThread 方法
+看下 `doStartThread` 方法
 ```java
 private void doStartThread() {
     executor.execute(new Runnable() {
@@ -1589,14 +1592,14 @@ private void doStartThread() {
 ```
 
 说明：
-1)首先调用 executor 的 execute 方法，这个 executor 就是在创建 EventLoopGroup 的时候创建的 ThreadPerTaskExecutor 类。该 execute 方法会将 Runnable 包装成 Netty 的 FastThreadLocalThread。
+1)首先调用 `executor` 的 `execute` 方法，这个 `executor` 就是在创建 `EventLoopGroup` 的时候创建的 `ThreadPerTaskExecutor` 类。该 `execute` 方法会将 `Runnable` 包装成 `Netty` 的 `FastThreadLocalThread`。
 2)任务中，首先判断线程中断状态，然后设置最后一次的执行时间。
-3)执行当前 NioEventLoop 的 run 方法，注意：这个方法是个死循环，是整个 EventLoop 的核心
-4)在 finally 块中，使用 CAS 不断修改 state 状态，改成 ST_SHUTTING_DOWN。也就是当线程 Loop 结束的时候。关闭线程。最后还要死循环确认是否关闭，否则不会 break。然后，执行 cleanup 操作，更新状态为
-5)ST_TERMINATED，并释放当前线程锁。如果任务队列不是空，则打印队列中还有多少个未完成的任务。并回调 terminationFuture 方法。
-6)其实最核心的就是 EventLoop 自身的 run 方法。再继续深入 run 方法
+3)执行当前 `NioEventLoop` 的 `run` 方法，注意：这个方法是个死循环，是整个 `EventLoop` 的核心
+4)在 `finally` 块中，使用 `CAS` 不断修改 `state` 状态，改成 `ST_SHUTTING_DOWN`。也就是当线程 `Loop` 结束的时候。关闭线程。最后还要死循环确认是否关闭，否则不会 `break`。然后，执行 `cleanup` 操作，更新状态为
+5)`ST_TERMINATED`，并释放当前线程锁。如果任务队列不是空，则打印队列中还有多少个未完成的任务。并回调 `terminationFuture` 方法。
+6)其实最核心的就是 `EventLoop` 自身的 `run` 方法。再继续深入 `run` 方法
 
-4.EventLoop 中的 Loop 是靠 run 实现的，我们分析下 run 方法(该方法在 NioEventLoop)
+4.`EventLoop` 中的 `Loop` 是靠 `run` 实现的，我们分析下 `run` 方法(该方法在 `NioEventLoop`)
 
 ```java
 @Override
@@ -1653,12 +1656,12 @@ protected void run() {
 ```
 
 说明:
-1)从上面的步骤可以看出，整个 run 方法做了 3 件事情：
-select 获取感兴趣的事件。
-processSelectedKeys 处理事件。
-runAllTasks执行队列中的任务。
+1)从上面的步骤可以看出，整个 `run` 方法做了 `3` 件事情：
+`select` 获取感兴趣的事件。
+`processSelectedKeys` 处理事件。
+`runAllTasks` 执行队列中的任务。
 
-2)上面的三个方法，我们就追一下 select 方法(体现非阻塞)核心 select 方法解析
+2)上面的三个方法，我们就追一下 `select` 方法(体现非阻塞)核心 `select` 方法解析
 
 ```java
 private void select(boolean oldWakenUp) throws IOException {
@@ -1741,18 +1744,19 @@ private void select(boolean oldWakenUp) throws IOException {
     }
 }
 ```
-说明：调用 selector的select 方法，默认阻塞一秒钟，如果有定时任务，则在定时任务剩余时间的基础上在加上 0.5 秒进行阻塞。当执行 execute 方法的时候，也就是添加任务的时候，唤醒 selector，防止 selector 阻塞时间过长
 
-5.EventLoop 作为 Netty 的核心的运行机制小结
-1)每次执行 execute 方法都是向队列中添加任务。当第一次添加时就启动线程，执行 run 方法，而 run 方法是整个 EventLoop 的核心，就像 EventLoop 的名字一样，LoopLoop，不停的 Loop，Loop 做什么呢？做 3 件事情。
+说明：调用 `selector` 的 `select` 方法，默认阻塞一秒钟，如果有定时任务，则在定时任务剩余时间的基础上在加上 `0.5` 秒进行阻塞。当执行 `execute` 方法的时候，也就是添加任务的时候，唤醒 `selector`，防止 `selector` 阻塞时间过长
 
-调用 selector 的 select 方法，默认阻塞一秒钟，如果有定时任务，则在定时任务剩余时间的基础上在加上 0.5 秒进行阻塞。当执行 execute 方法的时候，也就是添加任务的时候，唤醒 selecor，防止 selector 阻塞时间过长。
+5.`EventLoop` 作为 `Netty` 的核心的运行机制小结
+1)每次执行 `execute` 方法都是向队列中添加任务。当第一次添加时就启动线程，执行 `run` 方法，而 `run` 方法是整个 `EventLoop` 的核心，就像 `EventLoop` 的名字一样，`LoopLoop`，不停的 `Loop`，`Loop` 做什么呢？做 `3` 件事情。
 
-当 selector 返回的时候，回调用 processSelectedKeys 方法对 selectKey 进行处理。
+调用 `selector` 的 `select` 方法，默认阻塞一秒钟，如果有定时任务，则在定时任务剩余时间的基础上在加上 `0.5` 秒进行阻塞。当执行 `execute` 方法的时候，也就是添加任务的时候，唤醒 `selecor`，防止 `selector` 阻塞时间过长。
 
-当 processSelectedKeys 方法执行结束后，则按照 ioRatio 的比例执行 runAllTasks 方法，默认是 IO 任务时间和非 IO 任务时间是相同的，你也可以根据你的应用特点进行调优。比如非 IO 任务比较多，那么你就将
+当 `selector` 返回的时候，回调用 `processSelectedKeys` 方法对 `selectKey` 进行处理。
 
-ioRatio 调小一点，这样非 IO 任务就能执行的长一点。防止队列积攒过多的任务。
+当 `processSelectedKeys` 方法执行结束后，则按照 `ioRatio` 的比例执行 `runAllTasks` 方法，默认是 `IO` 任务时间和非 `IO` 任务时间是相同的，你也可以根据你的应用特点进行调优。比如非 `IO` 任务比较多，那么你就将
+
+`ioRatio` 调小一点，这样非 `IO` 任务就能执行的长一点。防止队列积攒过多的任务。
 
 ## 10.8 handler 中加入线程池和 Context 中添加线程池的源码剖析
 
@@ -1769,7 +1773,7 @@ ioRatio 调小一点，这样非 IO 任务就能执行的长一点。防止队�
 说明 演示两种方式的实现，以及从源码来追踪两种方式执行流程
 
 11. 处理耗时业务的第一种方式 -- handler种加入线程池
-   11.1对前面的Nettydemo源码进行修改，在EchoServerHandler的channelRead方法进行异步
+   11.1对前面的 `Netty` `demo`源码进行修改，在 `EchoServerHandler` 的 `channelRead` 方法进行异步
 
 ```java
 
@@ -1815,7 +1819,7 @@ public class EchoServerHandler extends ChannelInboundHandlerAdapter {
 ```
 
 说明：
-1)在 channelRead 方法，模拟了一个耗时 10 秒的操作，这里，我们将这个任务提交到了一个自定义的业务线程池中，这样，就不会阻塞 Netty 的 IO 线程。
+1)在 `channelRead` 方法，模拟了一个耗时 `10` 秒的操作，这里，我们将这个任务提交到了一个自定义的业务线程池中，这样，就不会阻塞 `Netty` 的 `IO` 线程。
 
 11.2这样处理之后，整个程序的逻辑如图
 
@@ -1823,10 +1827,10 @@ public class EchoServerHandler extends ChannelInboundHandlerAdapter {
 
 说明：
 
-1)解释一下上图，当 IO 线程轮询到一个 socket 事件，然后，IO 线程开始处理，当走到耗时 handler 的时候，将耗时任务交给业务线程池。
-2)当耗时任务执行完毕再执行 pipeline write 方法的时候，(代码中使用的是 context 的 write 方法，上图画的是执行 pipeline 方法,是一个意思)会将任务这个任务交给 IO 线程
+1)解释一下上图，当 `IO` 线程轮询到一个 `socket` 事件，然后，`IO` 线程开始处理，当走到耗时 `handler` 的时候，将耗时任务交给业务线程池。
+2)当耗时任务执行完毕再执行 `pipeline write` 方法的时候，(代码中使用的是 `context` 的 `write` 方法，上图画的是执行 `pipeline` 方法，是一个意思)会将任务这个任务交给 `IO` 线程
 
-11.3 write 方法的源码(在 AbstractChannelHandlerContext 类)
+11.3 `write` 方法的源码(在 `AbstractChannelHandlerContext` 类)
 
 ```java
 private void write(Object msg, boolean flush, ChannelPromise promise) {
@@ -1853,9 +1857,9 @@ private void write(Object msg, boolean flush, ChannelPromise promise) {
 
 说明:
 
-1)当判定下个 outbound 的 executor 线程不是当前线程的时候，会将当前的工作封装成 task，然后放入 mpsc 队列中，等待 IO 任务执行完毕后执行队列中的任务。
+1)当判定下个 `outbound` 的 `executor` 线程不是当前线程的时候，会将当前的工作封装成 `task`，然后放入 `mpsc` 队列中，等待 `IO` 任务执行完毕后执行队列中的任务。
 
-2)这里可以 Debug 来验证(提醒：Debug 时，服务器端 Debug, 客户端 Run 的方式)，当我们使用了 group.submit(newCallable<Object>(){} 在 handler 中加入线程池，就会进入到 safeExecute(executor, task, promise, m); 如果去掉这段代码，而使用普通方式来执行耗时的业务，那么就不会进入到 safeExecute(executor, task, promise, m);（说明：普通方式执行耗时代码，看我准备好的案例即可）
+2)这里可以 Debug 来验证(提醒：Debug 时，服务器端 Debug, 客户端 `Run` 的方式)，当我们使用了 `group.submit(new Callable<Object> (){}` 在 `handler` 中加入线程池，就会进入到 `safeExecute(executor, task, promise, m);` 如果去掉这段代码，而使用普通方式来执行耗时的业务，那么就不会进入到 `safeExecute(executor, task, promise, m);`（说明：普通方式执行耗时代码，看我准备好的案例即可）
 
 12.处理耗时业务的第二种方式 -Context 中添加线程池
 1.1在添加 pipeline 中的 handler 时候，添加一个线程池
@@ -1885,9 +1889,9 @@ ServerBootstrap b = new ServerBootstrap();
 
 说明：
 
-1)handler 中的代码就使用普通的方式来处理耗时业务。
-2)当我们在调用 addLast 方法添加线程池后，handler 将优先使用这个线程池，如果不添加，将使用 IO 线程
-3)当走到 AbstractChannelHandlerContext 的 invokeChannelRead 方法的时候，executor.inEventLoop() 是不会通过的，因为当前线程是 IO 线程 Context（也就是 Handler）的 executor 是业务线程，所以会异步执行,debug 下源码 
+1)`handler` 中的代码就使用普通的方式来处理耗时业务。
+2)当我们在调用 `addLast` 方法添加线程池后，`handler` 将优先使用这个线程池，如果不添加，将使用 `IO` 线程
+3)当走到 `AbstractChannelHandlerContext` 的 `invokeChannelRead` 方法的时候，`executor.inEventLoop()` 是不会通过的，因为当前线程是 `IO` 线程 `Context`（也就是 `Handler`）的 `executor` 是业务线程，所以会异步执行，debug 下源码 
 
 ```java
 static void invokeChannelRead(final AbstractChannelHandlerContext next, Object msg) {
@@ -1906,14 +1910,14 @@ static void invokeChannelRead(final AbstractChannelHandlerContext next, Object m
 }
 ```
 
-4)验证时，我们如果去掉 p.addLast(group,newEchoServerHandler()); 改成 p.addLastnewEchoServerHandler()); 你会发现代码不会进行异步执行
+4)验证时，我们如果去掉 `p.addLast(group,newEchoServerHandler());` 改成 `p.addLastnewEchoServerHandler());` 你会发现代码不会进行异步执行。
 
 5)后面的整个流程就变成和第一个方式一样了
 
 13.两种方式的比较
 
-1)第一种方式在 handler 中添加异步，可能更加的自由，比如如果需要访问数据库，那我就异步，如果不需要，就不异步，异步会拖长接口响应时间。因为需要将任务放进 mpscTask 中。如果 IO 时间很短，task 很多，可能一个循环下来，都没时间执行整个 task，导致响应时间达不到指标。
+1)第一种方式在 `handler` 中添加异步，可能更加的自由，比如如果需要访问数据库，那我就异步，如果不需要，就不异步，异步会拖长接口响应时间。因为需要将任务放进 `mpscTask` 中。如果 `IO` 时间很短，`task` 很多，可能一个循环下来，都没时间执行整个 `task`，导致响应时间达不到指标。
 
-2)第二种方式是 Netty 标准方式(即加入到队列)，但是，这么做会将整个 handler 都交给业务线程池。不论耗时不耗时，都加入到队列里，不够灵活。
+2)第二种方式是 `Netty` 标准方式(即加入到队列)，但是，这么做会将整个 `handler` 都交给业务线程池。不论耗时不耗时，都加入到队列里，不够灵活。
 
-3)各有优劣，从灵活性考虑，第一种较好
+3)各有优劣，从灵活性考虑，第一种较好。

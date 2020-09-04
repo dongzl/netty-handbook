@@ -972,10 +972,32 @@ protected DefaultChannelPipeline(Channel channel) {
 }
 ```
 
-说明：1）将 channel 赋值给 channel 字段，用于 pipeline 操作 channel。
+说明：
 
+1）将 channel 赋值给 channel 字段，用于 pipeline 操作 channel。
+2）创建一个 future 和 promise，用于异步回调使用。
+3）创建一个 inbound 的 tailContext，创建一个既是 inbound 类型又是 outbound 类型的 headContext.
+4）最后，将两个 Context 互相连接，形成双向链表。
+5）tailContext 和 HeadContext 非常的重要，所有 pipeline 中的事件都会流经他们，
 
-2）创建一个future和promise，用于异步回调使用。3）创建一个inbound的tailContext，创建一个既是inbound类型又是outbound类型的headContext.4）最后，将两个Context互相连接，形成双向链表。5）tailContext和HeadContext非常的重要，所有pipeline中的事件都会流经他们，2.2在add**添加处理器的时候创建Context**看下DefaultChannelPipeline的addLast方法如何创建的Context，代码如下@OverridepublicfinalChannelPipelineaddLast(EventExecutorGroupexecutor,ChannelHandler...handlers){if(handlers==null){//断点thrownewNullPointerException("handlers");}for(ChannelHandlerh:handlers){if(h==null){break;}addLast(executor,null,h);}returnthis;}继续Debug
+2.2 在 add**添加处理器的时候创建Context**看下 DefaultChannelPipeline 的 addLast 方法如何创建的 Context，代码如下
+```java
+@Override
+public final ChannelPipeline addLast(EventExecutorGroup executor, ChannelHandler... handlers) {
+    if (handlers == null) {//断点
+        throw new NullPointerException("handlers");
+    }
+    for (ChannelHandler h : handlers) {
+        if (h == null) {
+            break;
+        }
+        addLast(executor, null, h);
+    }
+    return this;
+}
+```
+
+继续 Debug
 
 
 publicfinalChannelPipelineaddLast(EventExecutorGroupgroup,Stringname,ChannelHandlerhandler){finalAbstractChannelHandlerContextnewCtx;synchronized(this){checkMultiplicity(handler);newCtx=newContext(group,filterName(name,handler),handler);addLast0(newCtx);//Iftheregisteredisfalseitmeansthatthechannelwasnotregisteredonaneventloopyet.//Inthiscaseweaddthecontexttothepipelineandaddataskthatwillcall//ChannelHandler.handlerAdded(...)oncethechannelisregistered.if(!registered){newCtx.setAddPending();callHandlerCallbackLater(newCtx,true);returnthis;}EventExecutorexecutor=newCtx.executor();if(!executor.inEventLoop()){newCtx.setAddPending();executor.execute(newRunnable(){@Overridepublicvoidrun(){callHandlerAdded0(newCtx);}

@@ -1754,8 +1754,6 @@ private void select(boolean oldWakenUp) throws IOException {
 
 ioRatio 调小一点，这样非 IO 任务就能执行的长一点。防止队列积攒过多的任务。
 
-```
-
 ## 10.8 handler 中加入线程池和 Context 中添加线程池的源码剖析
 
 ### 10.8.1 源码剖析目的
@@ -1775,37 +1773,147 @@ ioRatio 调小一点，这样非 IO 任务就能执行的长一点。防止队�
 
 ```java
 
-@SharablepublicclassEchoServerHandlerextendsChannelInboundHandlerAdapter{ioRatio调小一点，这样非IO任务就能执行的长一点。防止队列积攒过多的任务。
+@Sharable
+public class EchoServerHandler extends ChannelInboundHandlerAdapter {
 
+    static final EventExecutorGroup group = new DefaultEventExecutorGroup(16);
 
-staticfinalEventExecutorGroupgroup=newDefaultEventExecutorGroup(16);@OverridepublicvoidchannelRead(ChannelHandlerContextctx,Objectmsg)throwsUnsupportedEncodingException,InterruptedException{finalObjectmsgCop=msg;finalChannelHandlerContextcxtCop=ctx;group.submit(newCallable<Object>(){@OverridepublicObjectcall()throwsException{ByteBufbuf=(ByteBuf)msgCop;byte[]req=newbyte[buf.readableBytes()];buf.readBytes(req);Stringbody=newString(req,"UTF-8");Thread.sleep(10*1000);System.err.println(body+""+Thread.currentThread().getName());StringreqString="Helloiamserver~~~";ByteBufresp=Unpooled.copiedBuffer(reqString.getBytes());cxtCop.writeAndFlush(resp);returnnull;}});System.out.println("goon..");
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws UnsupportedEncodingException, InterruptedException {
+        final Object msgCop = msg;
+        final ChannelHandlerContext cxtCop = ctx;
+        group.submit(new Callable<Object>() {
+            @Override
+            public Object call() throws Exception {
+                ByteBuf buf = (ByteBuf)msgCop;
+                byte[] req = new byte[buf.readableBytes()];
+                buf.readBytes(req);
+                String body = new String(req, "UTF-8");
+                Thread.sleep(10 * 1000);
+                System.err.println(body + " " + Thread.currentThread().getName());
+                String reqString = "Helloiamserver~~~";
+                ByteBuf resp = Unpooled.copiedBuffer(reqString.getBytes());
+                cxtCop.writeAndFlush(resp);
+                return null;
+            }
+        });
+        System.out.println("goon..");
+    }
+    
+    @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) {
+        ctx.flush();
+    }
+    
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        // Close the connection when an exception is raised.
+        cause.printStackTrace();
+        ctx.close();
+    }
+}
+```
 
-
-}@OverridepublicvoidchannelReadComplete(ChannelHandlerContextctx){ctx.flush();}@OverridepublicvoidexceptionCaught(ChannelHandlerContextctx,Throwablecause){//Closetheconnectionwhenanexceptionisraised.cause.printStackTrace();ctx.close();}}说明：1)在channelRead方法，模拟了一个耗时10秒的操作，这里，我们将这个任务提交到了一个自定义的业务线程池中，这样，就不会阻塞Netty的IO线程。
+说明：
+1)在 channelRead 方法，模拟了一个耗时 10 秒的操作，这里，我们将这个任务提交到了一个自定义的业务线程池中，这样，就不会阻塞 Netty 的 IO 线程。
 
 11.2这样处理之后，整个程序的逻辑如图
 
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-说明：1)解释一下上图，当IO线程轮询到一个socket事件，然后，IO线程开始处理，当走到耗时handler的时候，将耗时任务交给业务线程池。2)当耗时任务执行完毕再执行pipelinewrite方法的时候，(代码中使用的是context的write方法，上图画的是执行pipeline方法,是一个意思)会将任务这个任务交给IO线程11.3write方法的源码(在AbstractChannelHandlerContext类)
+说明：
 
-privatevoidwrite(Objectmsg,booleanflush,ChannelPromisepromise){AbstractChannelHandlerContextnext=findContextOutbound();finalObjectm=pipeline.touch(msg,next);EventExecutorexecutor=next.executor();if(executor.inEventLoop()){if(flush){next.invokeWriteAndFlush(m,promise);}else{next.invokeWrite(m,promise);}}else{
+1)解释一下上图，当 IO 线程轮询到一个 socket 事件，然后，IO 线程开始处理，当走到耗时 handler 的时候，将耗时任务交给业务线程池。
+2)当耗时任务执行完毕再执行 pipeline write 方法的时候，(代码中使用的是 context 的 write 方法，上图画的是执行 pipeline 方法,是一个意思)会将任务这个任务交给 IO 线程
 
+11.3 write 方法的源码(在 AbstractChannelHandlerContext 类)
 
-AbstractWriteTasktask;if(flush){task=WriteAndFlushTask.newInstance(next,m,promise);}else{task=WriteTask.newInstance(next,m,promise);}safeExecute(executor,task,promise,m);}}说明:1)当判定下个outbound的executor线程不是当前线程的时候，会将当前的工作封装成task，然后放入mpsc队列中，等待IO任务执行完毕后执行队列中的任务。2)这里可以Debug来验证(提醒：Debug时，服务器端Debug,客户端Run的方式)，当我们使用了group.submit(newCallable<Object>(){}在handler中加入线程池，就会进入到safeExecute(executor,task,promise,m);如果去掉这段代码，而使用普通方式来执行耗时的业务，那么就不会进入到safeExecute(executor,task,promise,m);（说明：普通方式执行耗时代码，看我准备好的案例即可）
-
-12.处理耗时业务的第二种方式-Context中添加线程池1.1在添加pipeline中的handler时候，添加一个线程池
-
-//属性staticfinalEventExecutorGroupgroup=newDefaultEventExecutorGroup(16);ServerBootstrapb=newServerBootstrap();b.group(bossGroup,workerGroup).channel(NioServerSocketChannel.class).option(ChannelOption.SO_BACKLOG,100)
-
-
-.handler(newLoggingHandler(LogLevel.INFO)).childHandler(newChannelInitializer<SocketChannel>(){@OverridepublicvoidinitChannel(SocketChannelch)throwsException{ChannelPipelinep=ch.pipeline();if(sslCtx!=null){p.addLast(sslCtx.newHandler(ch.alloc()));}//p.addLast(newLoggingHandler(LogLevel.INFO));//p.addLast(newEchoServerHandler());p.addLast(group,newEchoServerHandler());}});说明：1)handler中的代码就使用普通的方式来处理耗时业务。2)当我们在调用addLast方法添加线程池后，handler将优先使用这个线程池，如果不添加，将使用IO线程3)当走到AbstractChannelHandlerContext的invokeChannelRead方法的时候，executor.inEventLoop()是不会通过的，因为当前线程是IO线程Context（也就是Handler）的executor是业务线程，所以会异步执行,debug下源码staticvoidinvokeChannelRead(finalAbstractChannelHandlerContextnext,Objectmsg){finalObjectm=next.pipeline.touch(ObjectUtil.checkNotNull(msg,"msg"),next);EventExecutorexecutor=next.executor();if(executor.inEventLoop()){next.invokeChannelRead(m);
-
-
-}else{executor.execute(newRunnable(){//执行run@Overridepublicvoidrun(){next.invokeChannelRead(m);}});}}4)验证时，我们如果去掉p.addLast(group,newEchoServerHandler());改成p.addLastnewEchoServerHandler());你会发现代码不会进行异步执行5)后面的整个流程就变成和第一个方式一样了
-
-13.两种方式的比较1)第一种方式在handler中添加异步，可能更加的自由，比如如果需要访问数据库，那我就异步，如果不需要，就不异步，异步会拖长接口响应时间。因为需要将任务放进mpscTask中。如果IO时间很短，task很多，可能一个循环下来，都没时间执行整个task，导致响应时间达不到指标。2)第二种方式是Netty标准方式(即加入到队列)，但是，这么做会将整个handler都交给业务线程池。不论耗时不耗时，都加入到队列里，不够灵活。3)各有优劣，从灵活性考虑，第一种较好
-
-
-
-
+```java
+private void write(Object msg, boolean flush, ChannelPromise promise) {
+    AbstractChannelHandlerContext next = findContextOutbound();
+    final Object m = pipeline.touch(msg, next);
+    EventExecutor executor = next.executor();
+    if(executor.inEventLoop()) {
+        if(flush) {
+            next.invokeWriteAndFlush(m, promise);
+        } else {
+            next.invokeWrite(m, promise);
+        }
+    } else {
+        AbstractWriteTask task;
+        if(flush) {
+            task = WriteAndFlushTask.newInstance(next, m, promise);
+        } else {
+            task = WriteTask.newInstance(next, m, promise);
+        }
+        safeExecute(executor, task, promise, m);
+    }
+}
 ```
+
+说明:
+
+1)当判定下个 outbound 的 executor 线程不是当前线程的时候，会将当前的工作封装成 task，然后放入 mpsc 队列中，等待 IO 任务执行完毕后执行队列中的任务。
+
+2)这里可以 Debug 来验证(提醒：Debug 时，服务器端 Debug, 客户端 Run 的方式)，当我们使用了 group.submit(newCallable<Object>(){} 在 handler 中加入线程池，就会进入到 safeExecute(executor, task, promise, m); 如果去掉这段代码，而使用普通方式来执行耗时的业务，那么就不会进入到 safeExecute(executor, task, promise, m);（说明：普通方式执行耗时代码，看我准备好的案例即可）
+
+12.处理耗时业务的第二种方式 -Context 中添加线程池
+1.1在添加 pipeline 中的 handler 时候，添加一个线程池
+
+//属性
+
+```java
+static final EventExecutorGroup group = new DefaultEventExecutorGroup(16);
+ServerBootstrap b = new ServerBootstrap();
+                b.group(bossGroup, workerGroup)
+                 .channel(NioServerSocketChannel.class)
+                 .option(ChannelOption.SO_BACKLOG, 100)
+                 .handler(newLoggingHandler(LogLevel.INFO))
+                 .childHandler(new ChannelInitializer<SocketChannel>() {
+                     @Override
+                     public void initChannel(SocketChannel ch) throws Exception {
+                         ChannelPipeline p = ch.pipeline();
+                         if(sslCtx != null) {
+                             p.addLast(sslCtx.newHandler(ch.alloc()));
+                         }
+                         //p.addLast(new LoggingHandler(LogLevel.INFO));
+                         //p.addLast(new EchoServerHandler());
+                         p.addLast(group, new EchoServerHandler());
+                    }
+                });
+```
+
+说明：
+
+1)handler 中的代码就使用普通的方式来处理耗时业务。
+2)当我们在调用 addLast 方法添加线程池后，handler 将优先使用这个线程池，如果不添加，将使用 IO 线程
+3)当走到 AbstractChannelHandlerContext 的 invokeChannelRead 方法的时候，executor.inEventLoop() 是不会通过的，因为当前线程是 IO 线程 Context（也就是 Handler）的 executor 是业务线程，所以会异步执行,debug 下源码 
+
+```java
+static void invokeChannelRead(final AbstractChannelHandlerContext next, Object msg) {
+    final Object m = next.pipeline.touch(ObjectUtil.checkNotNull(msg, "msg"), next);
+    EventExecutor executor = next.executor();
+    if(executor.inEventLoop()) {
+        next.invokeChannelRead(m);
+    } else {
+        executor.execute(new Runnable() {//执行run
+            @Override
+            public void run() {
+                next.invokeChannelRead(m);
+            }
+        });
+    }
+}
+```
+
+4)验证时，我们如果去掉 p.addLast(group,newEchoServerHandler()); 改成 p.addLastnewEchoServerHandler()); 你会发现代码不会进行异步执行
+
+5)后面的整个流程就变成和第一个方式一样了
+
+13.两种方式的比较
+
+1)第一种方式在 handler 中添加异步，可能更加的自由，比如如果需要访问数据库，那我就异步，如果不需要，就不异步，异步会拖长接口响应时间。因为需要将任务放进 mpscTask 中。如果 IO 时间很短，task 很多，可能一个循环下来，都没时间执行整个 task，导致响应时间达不到指标。
+
+2)第二种方式是 Netty 标准方式(即加入到队列)，但是，这么做会将整个 handler 都交给业务线程池。不论耗时不耗时，都加入到队列里，不够灵活。
+
+3)各有优劣，从灵活性考虑，第一种较好

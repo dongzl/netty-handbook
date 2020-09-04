@@ -535,29 +535,33 @@ private static void doBind0(
 1. 该方法的参数为 initAndRegister 的 future，NioServerSocketChannel，端口地址，NioServerSocketChannel 的 promise
 2. 这里就可以根据前面下的断点，一直 debug:
 
-将调用LoggingHandler的invokeBind方法,最后会追到//DefaultChannelPipeline类的bind//然后进入到unsafe.bind方法debug,注意要追踪到//unsafe.bind,要debug第二圈的时候，才能看到.
-
 ```java
+// 将调用 LoggingHandler 的 invokeBind 方法,最后会追到
+// DefaultChannelPipeline 类的 bind
+// 然后进入到 unsafe.bind 方法 debug，注意要追踪到
+// unsafe.bind，要 debug 第二圈的时候，才能看到。
+
 @Override
 public void bind (ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) throws Exception {
     unsafe.bind(localAddress,promise);
 }
 
-继续追踪cAbstractChannel 的 
+// 继续追踪 AbstractChannel 的 
 
 public final void bind (final SocketAddress localAddress, final ChannelPromise promise) {
     //....
-    try{//!!!!小红旗可以看到，这里最终的方法就是doBind方法，执行成功后，执行通道的fireChannelActive方法，告诉所有的handler，已经成功绑定。
-    doBind(localAddress);
-    //
+    try{
+        //!!!! 小红旗可以看到，这里最终的方法就是 doBind 方法，执行成功后，执行通道的 fireChannelActive 方法，告诉所有的 handler，已经成功绑定。
+        doBind(localAddress);//
     } catch (Throwable t) {
         safeSetFailure(promise, t);
-        closeIfClosed();return;
+        closeIfClosed();
+        return;
     }
 }
 ```
 
-3)最终doBind就会追踪到NioServerSocketChannel的doBind,说明Netty底层使用的是Nio
+3. 最终 doBind 就会追踪到 NioServerSocketChannel 的 doBind，说明 Netty 底层使用的是 Nio
 
 ```java
 @Override
@@ -570,15 +574,19 @@ protected void doBind (SocketAddress localAddress) throws Exception {
 }
 ```
 
-4.7回到bind方法(alt+v)，最后一步：safeSetSuccess(promise)，告诉promise任务成功了。其可以执行监听器的方法了。到此整个启动过程已经结束了，ok了5.继续atl+V服务器就回进入到(NioEventLoop类)一个循环代码，进行监听
+4. 回到 bind 方法（alt+v），最后一步：safeSetSuccess(promise)，告诉 promise 任务成功了。其可以执行监听器的方法了。到此整个启动过程已经结束了，ok 了
+
+5. 继续 atl+V 服务器就回进入到（NioEventLoop 类）一个循环代码，进行监听
 
 ```java
 @Override
 protected void run() {
     for(;;) {
         try{
-            
+
         }
+    }
+}
 ```
 
 
@@ -613,60 +621,186 @@ protected void run() {
  
 源码分析过程
 
+1. 断点位置 NioEventLoop 的如下方法 processSelectedKey
+
 ```java
-
-1.断点位置NioEventLoop的如下方法processSelectedKey
-
-if((readyOps&(SelectionKey.OP_READ|SelectionKey.OP_ACCEPT))!=0||readyOps==0){unsafe.read();//断点位置}
-
-2.执行浏览器http://localhost:8007/,客户端发出请求3.从的断点我们可以看到，readyOps是16，也就是Accept事件。说明浏览器的请求已经进来了。4.这个unsafe是boss线程中NioServerSocketChannel的AbstractNioMessageChannel$NioMessageUnsafe对象。我们进入到AbstractNioMessageChannel$NioMessageUnsafe的read方法中5.read方法代码并分析:
-
-@Overridepublicvoidread(){asserteventLoop().inEventLoop();finalChannelConfigconfig=config();finalChannelPipelinepipeline=pipeline();finalRecvByteBufAllocator.HandleallocHandle=unsafe().recvBufAllocHandle();allocHandle.reset(config);booleanclosed=false;Throwableexception=null;try{try{do{intlocalRead=doReadMessages(readBuf);if(localRead==0){
-
-
-break;}if(localRead<0){closed=true;break;}allocHandle.incMessagesRead(localRead);}while(allocHandle.continueReading());}catch(Throwablet){exception=t;}intsize=readBuf.size();for(inti=0;i<size;i++){readPending=false;pipeline.fireChannelRead(readBuf.get(i));}readBuf.clear();allocHandle.readComplete();pipeline.fireChannelReadComplete();if(exception!=null){closed=closeOnReadError(exception);pipeline.fireExceptionCaught(exception);
-
-
-}if(closed){inputShutdown=true;if(isOpen()){close(voidPromise());}}}finally{//CheckifthereisareadPendingwhichwasnotprocessedyet.//Thiscouldbefortworeasons://*TheusercalledChannel.read()orChannelHandlerContext.read()inchannelRead(...)method//*TheusercalledChannel.read()orChannelHandlerContext.read()inchannelReadComplete(...)method////Seehttps://github.com/netty/netty/issues/2254if(!readPending&&!config.isAutoRead()){removeReadOp();}}}
-
-说明：1)检查该eventloop线程是否是当前线程。asserteventLoop().inEventLoop()2)执行doReadMessages方法，并传入一个readBuf变量，这个变量是一个List，也就是容器。3)循环容器，执行pipeline.fireChannelRead(readBuf.get(i));4)doReadMessages是读取boss线程中的NioServerSocketChannel接受到的请求。并把这些请求放进容器,
-
-
-一会我们debug下doReadMessages方法.5)循环遍历容器中的所有请求，调用pipeline的fireChannelRead方法，用于处理这些接受的请求或者其他事件，在read方法中，循环调用ServerSocket的pipeline的fireChannelRead方法,开始执行管道中的handler的ChannelRead方法(debug进入)
-
-6.追踪一下doReadMessages方法,就可以看得更清晰
-
-protectedintdoReadMessages(List<Object>buf)throwsException{SocketChannelch=SocketUtils.accept(javaChannel());buf.add(newNioSocketChannel(this,ch));return1;}说明：1)通过工具类，调用NioServerSocketChannel内部封装的serverSocketChannel的accept方法，这是Nio做法。2)获取到一个JDK的SocketChannel，然后，使用NioSocketChannel进行封装。最后添加到容器中3)这样容器buf中就有了NioSocketChannel[如果有兴趣可以追一下NioSocketChannel是如何创建的,我就不追了]
-
-7.回到read方法，继续分析循环执行pipeline.fireChannelRead方法
-
-1)前面分析doReadMessages方法的作用是通过ServerSocket的accept方法获取到Tcp连接，然后封装成Netty的NioSocketChannel对象。最后添加到容器中2)在read方法中，循环调用ServerSocket的pipeline的fireChannelRead方法,开始执行管道中的handler的ChannelRead方法(debug进入)3)经过dubug(多次)，可以看到会反复执行多个handler的ChannelRead,我们知道，pipeline里面又4个
-
-handler，分别是Head，LoggingHandler，ServerBootstrapAcceptor，Tail。4)我们重点看看ServerBootstrapAcceptor。debug之后，断点会进入到ServerBootstrapAcceptor中来。我们来看看ServerBootstrapAcceptor的channelRead方法(要多次debug才可以)5)channelRead方法
-
-publicvoidchannelRead(ChannelHandlerContextctx,Objectmsg){finalChannelchild=(Channel)msg;child.pipeline().addLast(childHandler);setChannelOptions(child,childOptions,logger);for(Entry<AttributeKey<?>,Object>e:childAttrs){child.attr((AttributeKey<Object>)e.getKey()).set(e.getValue());}try{//将客户端连接注册到worker线程池childGroup.register(child).addListener(newChannelFutureListener(){@OverridepublicvoidoperationComplete(ChannelFuturefuture)throwsException{if(!future.isSuccess()){forceClose(child,future.cause());}}});}catch(Throwablet){forceClose(child,t);
-
+if((readyOps & (SelectionKey.OP_READ | SelectionKey.OP_ACCEPT)) != 0 || readyOps == 0) {
+    unsafe.read();//断点位置
 }
-}
-
-说明：1)msg强转成Channel，实际上就是NioSocketChannel。2)添加NioSocketChannel的pipeline的handler，就是我们main方法里面设置的childHandler方法里的。3)设置NioSocketChannel的各种属性。4)将该NioSocketChannel注册到childGroup中的一个EventLoop上，并添加一个监听器。5)这个childGroup就是我们main方法创建的数组workerGroup。
-
-8.进入register方法查看(步步追踪会到)
-
-@Overridepublicfinalvoidregister(EventLoopeventLoop,finalChannelPromisepromise){AbstractChannel.this.eventLoop=eventLoop;if(eventLoop.inEventLoop()){register0(promise);}else{eventLoop.execute(newRunnable(){@Overridepublicvoidrun(){register0(promise);//进入到这里
-
-
-}});}}继续进入到下面方法，执行管道中可能存在的任务,这里我们就不追了
-
-9.最终会调用doBeginRead方法，也就是AbstractNioChannel类的方法
-
-@OverrideprotectedvoiddoBeginRead()throwsException{//Channel.read()orChannelHandlerContext.read()wascalledfinalSelectionKeyselectionKey=this.selectionKey;//断点if(!selectionKey.isValid()){return;}readPending=true;finalintinterestOps=selectionKey.interestOps();if((interestOps&readInterestOp)==0){selectionKey.interestOps(interestOps|readInterestOp);}}
-
-
-10.这个地方调试时，请把前面的断点都去掉，然后启动服务器就会停止在doBeginRead（需要先放过该断点，然后浏览器请求，才能看到效果）11.执行到这里时，针对于这个客户端的连接就完成了，接下来就可以监听读事件了
-
-
 ```
+
+2. 执行浏览器http://localhost:8007/，客户端发出请求
+3. 从的断点我们可以看到，readyOps 是 16，也就是 Accept 事件。说明浏览器的请求已经进来了。
+4. 这个 unsafe 是 boss 线程中 NioServerSocketChannel 的 `AbstractNioMessageChannel$NioMessageUnsafe` 对象。我们进入到 `AbstractNioMessageChannel$NioMessageUnsafe` 的 read 方法中
+5. read 方法代码并分析:
+
+```java
+@Override
+public void read() {
+    asserteventLoop().inEventLoop();
+    final ChannelConfig config = config();
+    final ChannelPipeline pipeline = pipeline();
+    final RecvByteBufAllocator.Handle allocHandle = unsafe().recvBufAllocHandle();
+    allocHandle.reset(config);
+    booleanclosed = false;
+    Throwable exception = null;
+    try {
+        try {
+            do {
+                int localRead = doReadMessages(readBuf);
+                if (localRead == 0) {
+                    break;
+                }
+                if (localRead < 0) {
+                    closed = true;
+                    break;
+                }
+                
+                allocHandle.incMessagesRead(localRead);
+            } while (allocHandle.continueReading());
+        } catch (Throwable t) {
+            exception = t;
+        }
+        
+        int size = readBuf.size();
+        for (int i = 0; i < size; i++) {
+            readPending = false;
+            pipeline.fireChannelRead(readBuf.get(i));
+        }
+        readBuf.clear();
+        allocHandle.readComplete();
+        pipeline.fireChannelReadComplete();
+        
+        if (exception != null) {
+            closed = closeOnReadError(exception);
+
+            pipeline.fireExceptionCaught(exception);
+        }
+        
+        if (closed) {
+            inputShutdown = true;
+            if(isOpen()) {
+                close(voidPromise());
+            }
+        }
+    } finally {
+        //Check if there is a readPending which was not processed yet.
+        //This could be for two reasons:
+        //* The user called Channel.read() or ChannelHandlerContext.read() in channelRead(...) method
+        //* The user called Channel.read() or ChannelHandlerContext.read() in channelReadComplete(...) method
+        //
+        // See https://github.com/netty/netty/issues/2254
+        if (!readPending && !config.isAutoRead()) {
+            removeReadOp();
+        }
+    }
+}
+```
+
+说明：
+1)检查该 eventloop 线程是否是当前线程。asserteventLoop().inEventLoop()
+
+2)执行 doReadMessages 方法，并传入一个 readBuf 变量，这个变量是一个 List，也就是容器。
+  
+3)循环容器，执行 pipeline.fireChannelRead(readBuf.get(i));- 
+
+4)doReadMessages 是读取 boss 线程中的 NioServerSocketChannel 接受到的请求。并把这些请求放进容器，一会我们 debug 下 doReadMessages 方法。
+
+5)循环遍历容器中的所有请求，调用 pipeline 的 fireChannelRead 方法，用于处理这些接受的请求或者其他事件，在 read 方法中，循环调用 ServerSocket 的 pipeline 的 fireChannelRead 方法,开始执行管道中的 handler 的 ChannelRead 方法（debug 进入）
+
+
+6. 追踪一下 doReadMessages 方法，就可以看得更清晰
+
+```java
+protected int doReadMessages (List<Object> buf) throws Exception {
+    SocketChannel ch = SocketUtils.accept(javaChannel());
+    buf.add(newNioSocketChannel(this, ch));
+    return 1;
+}
+```
+说明：
+1)通过工具类，调用 NioServerSocketChannel 内部封装的 serverSocketChannel 的 accept 方法，这是 Nio 做法。
+2)获取到一个 JDK 的 SocketChannel，然后，使用 NioSocketChannel 进行封装。最后添加到容器中
+3)这样容器 buf 中就有了 NioSocketChannel[如果有兴趣可以追一下NioSocketChannel是如何创建的,我就不追了]
+
+7. 回到 read 方法，继续分析循环执行 pipeline.fireChannelRead 方法
+
+1)前面分析 doReadMessages 方法的作用是通过 ServerSocket 的 accept 方法获取到 Tcp 连接，然后封装成 Netty 的 NioSocketChannel 对象。最后添加到容器中
+2)在 read 方法中，循环调用 ServerSocket 的 pipeline 的 fireChannelRead 方法,开始执行管道中的 handler 的 ChannelRead 方法(debug进入)
+3)经过 dubug(多次)，可以看到会反复执行多个 handler 的 ChannelRead，我们知道，pipeline 里面又 4 个 handler，分别是 Head，LoggingHandler，ServerBootstrapAcceptor，Tail。
+4)我们重点看看 ServerBootstrapAcceptor。debug 之后，断点会进入到 ServerBootstrapAcceptor 中来。我们来看看 ServerBootstrapAcceptor 的 channelRead 方法(要多次 debug 才可以)
+5)channelRead方法
+
+```java
+public void channelRead (ChannelHandlerContext ctx, Object msg) {
+    final Channelchild = (Channel)msg;
+    child.pipeline().addLast(childHandler);
+    setChannelOptions(child, childOptions, logger);
+    for (Entry<AttributeKey<?>, Object> e : childAttrs) {
+        child.attr((AttributeKey<Object>)e.getKey()).set(e.getValue());
+    }
+    try {//将客户端连接注册到 worker 线程池
+        childGroup.register(child).addListener(new ChannelFutureListener() {
+            @Override
+            public void operationComplete(ChannelFuturefuture) throws Exception {
+                if (!future.isSuccess()) {
+                    forceClose(child, future.cause());
+                }
+            }
+        });
+    } catch (Throwable t) {
+        forceClose(child, t);
+    }
+}
+```
+说明：
+1)msg 强转成 Channel，实际上就是 NioSocketChannel。
+2)添加 NioSocketChannel 的 pipeline 的 handler，就是我们 main 方法里面设置的 childHandler 方法里的。
+3)设置 NioSocketChannel 的各种属性。
+4)将该 NioSocketChannel 注册到 childGroup 中的一个 EventLoop 上，并添加一个监听器。
+5)这个 childGroup 就是我们 main 方法创建的数组 workerGroup。
+
+8. 进入 register 方法查看(步步追踪会到)
+
+```java
+@Override
+public final void register (EventLoop eventLoop, final ChannelPromise promise) {
+    AbstractChannel.this.eventLoop = eventLoop;
+    if (eventLoop.inEventLoop()) {
+        register0(promise);
+    } else {
+        eventLoop.execute(new Runnable(){
+            @Override
+            public void run() {
+                register0(promise);//进入到这里
+            }
+        });
+    }
+}
+
+// 继续进入到下面方法，执行管道中可能存在的任务,这里我们就不追了
+```
+
+9. 最终会调用 doBeginRead 方法，也就是 AbstractNioChannel 类的方法
+
+```java
+@Override
+protected void doBeginRead() throws Exception {
+    //Channel.read() or ChannelHandlerContext.read() was called
+    final SelectionKey selectionKey = this.selectionKey;//断点
+    if (!selectionKey.isValid()) {
+        return;
+    }
+    readPending = true;
+    final int interestOps = selectionKey.interestOps();
+    if ((interestOps&readInterestOp) == 0) {
+        selectionKey.interestOps(interestOps | readInterestOp);
+    }
+}
+```
+
+10. 这个地方调试时，请把前面的断点都去掉，然后启动服务器就会停止在 doBeginRead（需要先放过该断点，然后浏览器请求，才能看到效果）
+11. 执行到这里时，针对于这个客户端的连接就完成了，接下来就可以监听读事件了
 
 ### 10.3.3 Netty 接受请求过程梳理
 
@@ -689,43 +823,156 @@ publicvoidchannelRead(ChannelHandlerContextctx,Objectmsg){finalChannelchild=(Cha
 
 ### 10.4.3 源码剖析
 
-1.ChannelPipeline|ChannelHandler|ChannelHandlerContext介绍1.1三者关系1)每当ServerSocket创建一个新的连接，就会创建一个Socket，对应的就是目标客户端。2)每一个新创建的Socket都将会分配一个全新的ChannelPipeline（以下简称pipeline）3)每一个ChannelPipeline内部都含有多个ChannelHandlerContext（以下简称Context）4)他们一起组成了双向链表，这些Context用于包装我们调用addLast方法时添加的ChannelHandler（以下简称handler）
+1. ChannelPipeline | ChannelHandler | ChannelHandlerContext介绍
+1.1 三者关系
+1)每当 ServerSocket 创建一个新的连接，就会创建一个 Socket，对应的就是目标客户端。
+2)每一个新创建的 Socket 都将会分配一个全新的 ChannelPipeline（以下简称pipeline）
+3)每一个 ChannelPipeline 内部都含有多个 ChannelHandlerContext（以下简称 Context）
+4)他们一起组成了双向链表，这些 Context 用于包装我们调用 addLast 方法时添加的 ChannelHandler（以下简称handler）
 
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
+1)上图中：ChannelSocket 和 ChannelPipeline 是一对一的关联关系，而 pipeline 内部的多个 Context 形成了链表，Context 只是对 Handler 的封装。
+2)当一个请求进来的时候，会进入 Socket 对应的 pipeline，并经过 pipeline 所有的 handler，对，就是设计模式中的过滤器模式。
 
-1)上图中：ChannelSocket和ChannelPipeline是一对一的关联关系，而pipeline内部的多个Context形成了链表，Context只是对Handler的封装。2)当一个请求进来的时候，会进入Socket对应的pipeline，并经过pipeline所有的handler，对，就是设计模式中的过滤器模式。1.2ChannelPipeline作用及设计1)pipeline的接口设计
+1.2 ChannelPipeline 作用及设计
+
+1)pipeline 的接口设计
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 部分源码
 
-可以看到该接口继承了inBound，outBound，Iterable接口，表示他可以调用数据出站的方法和入站的方法，同时也能遍历内部的链表，看看他的几个代表性的方法，基本上都是针对handler链表的插入，追加，删除，替换操作，类似是一个LinkedList。同时，也能返回channel（也就是socket）1)在pipeline的接口文档上，提供了一幅图
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+可以看到该接口继承了 inBound，outBound，Iterable 接口，表示他可以调用数据出站的方法和入站的方法，同时也能遍历内部的链表，看看他的几个代表性的方法，基本上都是针对 handler 链表的插入，追加，删除，替换操作，类似是一个 LinkedList。同时，也能返回 channel（也就是 socket）
+
+1)在 pipeline 的接口文档上，提供了一幅图
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+对上图的解释说明：
+*这是一个 handler 的 list，handler 用于处理或拦截入站事件和出站事件，pipeline 实现了过滤器的高级形式，以便用户控制事件如何处理以及 handler 在 pipeline 中如何交互。
+
+*上图描述了一个典型的 handler 在 pipeline 中处理 I/O 事件的方式，IO 事件由 inboundHandler 或者 outBoundHandler 处理，并通过调用ChannelHandlerContext.fireChannelRead 方法转发给其最近的处理程序。
+
+*入站事件由入站处理程序以自下而上的方向处理，如图所示。入站处理程序通常处理由图底部的 I/O 线程生成入站数据。入站数据通常从如 SocketChannel.read(ByteBuffer) 获取。
+
+*通常一个 pipeline 有多个 handler，例如，一个典型的服务器在每个通道的管道中都会有以下处理程序协议解码器-将二进制数据转换为 Java 对象。协议编码器-将 Java 对象转换为二进制数据。业务逻辑处理程序-执行实际业务逻辑（例如数据库访问）
+
+*你的业务程序不能将线程阻塞，会影响 IO 的速度，进而影响整个 Netty 程序的性能。如果你的业务程序很快，就可以放在 IO 线程中，反之，你需要异步执行。或者在添加 handler 的时候添加一个线程池，例如：
+
+// 下面这个任务执行的时候，将不会阻塞 IO 线程，执行的线程来自 group 线程池
+
+`pipeline.addLast(group, "handler", new MyBusinessLogicHandler());`
+
+1.3 ChannelHandler 作用及设计
+1)源码
+```java
+public interface ChannelHandler {
+    //当把 ChannelHandler 添加到 pipeline 时被调用
+    void handlerAdded(ChannelHandlerContext ctx) throws Exception;
+    //当从 pipeline 中移除时调用
+    void handlerRemoved(ChannelHandlerContext ctx) throws Exception;
+    //当处理过程中在 pipeline 发生异常时调用
+    @Deprecated
+    void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception;
+}
+```
+2)ChannelHandler 的作用就是处理 IO 事件或拦截 IO 事件，并将其转发给下一个处理程序 ChannelHandler。Handler 处理事件时分入站和出站的，两个方向的操作都是不同的，因此，Netty 定义了两个子接口继承 ChannelHandler
 
 
-对上图的解释说明：*这是一个handler的list，handler用于处理或拦截入站事件和出站事件，pipeline实现了过滤器的高级形式，以便用户控制事件如何处理以及handler在pipeline中如何交互。*上图描述了一个典型的handler在pipeline中处理I/O事件的方式，IO事件由inboundHandler或者outBoundHandler处理，并通过调用ChannelHandlerContext.fireChannelRead方法转发给其最近的处理程序。
+2)ChannelInboundHandler 入站事件接口
 
-*入站事件由入站处理程序以自下而上的方向处理，如图所示。入站处理程序通常处理由图底部的I/O线程生成入站数据。入站数据通常从如SocketChannel.read(ByteBuffer)获取。*通常一个pipeline有多个handler，例如，一个典型的服务器在每个通道的管道中都会有以下处理程序协议解码器-将二进制数据转换为Java对象。协议编码器-将Java对象转换为二进制数据。业务逻辑处理程序-执行实际业务逻辑（例如数据库访问）*你的业务程序不能将线程阻塞，会影响IO的速度，进而影响整个Netty程序的性能。如果你的业务程序很快，就可以放在IO线程中，反之，你需要异步执行。或者在添加handler的时候添加一个线程池，例如：//下面这个任务执行的时候，将不会阻塞IO线程，执行的线程来自group线程池pipeline.addLast（group，“handler”，newMyBusinessLogicHandler（））;
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-1.3ChannelHandler作用及设计1)源码publicinterfaceChannelHandler{//当把ChannelHandler添加到pipeline时被调用voidhandlerAdded(ChannelHandlerContextctx)throwsException;//当从pipeline中移除时调用voidhandlerRemoved(ChannelHandlerContextctx)throwsException;//当处理过程中在pipeline发生异常时调用@DeprecatedvoidexceptionCaught(ChannelHandlerContextctx,Throwablecause)throwsException;}2)ChannelHandler的作用就是处理IO事件或拦截IO事件，并将其转发给下一个处理程序ChannelHandler。Handler处理事件时分入站和出站的，两个方向的操作都是不同的，因此，Netty定义了两个子接口继承ChannelHandler
+*channelActive 用于当 Channel 处于活动状态时被调用；
 
+*channelRead 当从 Channel 读取数据时被调用等等方法。
 
-2)ChannelInboundHandler入站事件接口
+*程序员需要重写一些方法，当发生关注的事件，需要在方法中实现我们的业务逻辑，因为当事件发生时，Netty 会回调对应的方法。
 
-*channelActive用于当Channel处于活动状态时被调用；*channelRead当从Channel读取数据时被调用等等方法。*程序员需要重写一些方法，当发生关注的事件，需要在方法中实现我们的业务逻辑，因为当事件发生时，Netty会回调对应的方法。3)ChannelOutboundHandler出站事件接口
+3)ChannelOutboundHandler 出站事件接口
 
-*bind方法，当请求将Channel绑定到本地地址时调用*close方法，当请求关闭Channel时调用等等*出站操作都是一些连接和写出数据类似的方法。
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-4)ChannelDuplexHandler处理出站和入站事件
+*bind 方法，当请求将 Channel 绑定到本地地址时调用
 
-*ChannelDuplexHandler间接实现了入站接口并直接实现了出站接口。*是一个通用的能够同时处理入站事件和出站事件的类。1.4ChannelHandlerContext作用及设计1)ChannelHandlerContextUML图
+*close 方法，当请求关闭 Channel 时调用等等
 
-ChannelHandlerContext继承了出站方法调用接口和入站方法调用接口1)ChannelOutboundInvoker和ChannelInboundInvoker部分源码
+*出站操作都是一些连接和写出数据类似的方法。
 
+4)ChannelDuplexHandler 处理出站和入站事件
 
-*这两个invoker就是针对入站或出站方法来的，就是在入站或出站handler的外层再包装一层，达到在方法前后拦截并做一些特定操作的目的2)ChannelHandlerContext部分源码
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-*ChannelHandlerContext不仅仅时继承了他们两个的方法，同时也定义了一些自己的方法*这些方法能够获取Context上下文环境中对应的比如channel，executor，handler，pipeline，内存分配器，关联的handler是否被删除。*Context就是包装了handler相关的一切，以方便Context可以在pipeline方便的操作handler2.ChannelPipeline|ChannelHandler|ChannelHandlerContext创建过程分为3个步骤来看创建的过程：*任何一个ChannelSocket创建的同时都会创建一个pipeline。*当用户或系统内部调用pipeline的add***方法添加handler时，都会创建一个包装这handler的Context。*这些Context在pipeline中组成了双向链表。
+*ChannelDuplexHandler 间接实现了入站接口并直接实现了出站接口。
 
+*是一个通用的能够同时处理入站事件和出站事件的类。
 
-2.1Socket创建的时候创建pipeline在SocketChannel的抽象父类AbstractChannel的构造方法中protectedAbstractChannel(Channelparent){this.parent=parent;//断点测试id=newId();unsafe=newUnsafe();pipeline=newChannelPipeline();}Debug一下,可以看到代码会执行到这里,然后继续追踪到protectedDefaultChannelPipeline(Channelchannel){this.channel=ObjectUtil.checkNotNull(channel,"channel");succeededFuture=newSucceededChannelFuture(channel,null);voidPromise=newVoidChannelPromise(channel,true);tail=newTailContext(this);head=newHeadContext(this);head.next=tail;tail.prev=head;}说明：1）将channel赋值给channel字段，用于pipeline操作channel。
+1.4ChannelHandlerContext 作用及设计
+
+1)ChannelHandlerContext UML 图
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+ChannelHandlerContext 继承了出站方法调用接口和入站方法调用接口
+
+1)ChannelOutboundInvoker 和 ChannelInboundInvoker 部分源码
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+*这两个 invoker 就是针对入站或出站方法来的，就是在入站或出站 handler 的外层再包装一层，达到在方法前后拦截并做一些特定操作的目的
+
+2)ChannelHandlerContext 部分源码
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+*ChannelHandlerContext 不仅仅时继承了他们两个的方法，同时也定义了一些自己的方法
+
+*这些方法能够获取 Context 上下文环境中对应的比如 channel，executor，handler，pipeline，内存分配器，关联的 handler 是否被删除。
+
+*Context 就是包装了 handler 相关的一切，以方便 Context 可以在 pipeline 方便的操作 handler
+
+2.ChannelPipeline | ChannelHandler | ChannelHandlerContext
+
+创建过程分为 3 个步骤来看创建的过程：
+
+*任何一个 ChannelSocket 创建的同时都会创建一个 pipeline。
+
+*当用户或系统内部调用 pipeline 的 add ***方法添加 handler 时，都会创建一个包装这 handler 的 Context。
+
+*这些 Context 在 pipeline 中组成了双向链表。
+
+2.1 Socket 创建的时候创建 pipeline 在 SocketChannel 的抽象父类 AbstractChannel 的构造方法中
+
+```java
+protected AbstractChannel(Channel parent) {
+    this.parent=parent;//断点测试
+    id = newId();
+    unsafe = new Unsafe();
+    pipeline = new ChannelPipeline();
+}
+```
+
+Debug 一下,可以看到代码会执行到这里,然后继续追踪到
+
+```java
+protected DefaultChannelPipeline(Channel channel) {
+    this.channel = ObjectUtil.checkNotNull(channel, "channel");
+    succeededFuture = new SucceededChannelFuture(channel, null);
+    voidPromise = new VoidChannelPromise(channel, true);
+    
+    tail = new TailContext(this);
+    head = new HeadContext(this);
+    head.next = tail;
+    tail.prev = head;
+}
+```
+
+说明：1）将 channel 赋值给 channel 字段，用于 pipeline 操作 channel。
 
 
 2）创建一个future和promise，用于异步回调使用。3）创建一个inbound的tailContext，创建一个既是inbound类型又是outbound类型的headContext.4）最后，将两个Context互相连接，形成双向链表。5）tailContext和HeadContext非常的重要，所有pipeline中的事件都会流经他们，2.2在add**添加处理器的时候创建Context**看下DefaultChannelPipeline的addLast方法如何创建的Context，代码如下@OverridepublicfinalChannelPipelineaddLast(EventExecutorGroupexecutor,ChannelHandler...handlers){if(handlers==null){//断点thrownewNullPointerException("handlers");}for(ChannelHandlerh:handlers){if(h==null){break;}addLast(executor,null,h);}returnthis;}继续Debug

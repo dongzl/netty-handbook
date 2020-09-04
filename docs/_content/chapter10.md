@@ -999,11 +999,40 @@ public final ChannelPipeline addLast(EventExecutorGroup executor, ChannelHandler
 
 继续 Debug
 
+```java
+public final ChannelPipeline addLast(EventExecutorGroup group, String name, ChannelHandler handler) {
+    final AbstractChannelHandlerContext newCtx;
+    synchronized(this) {
+        checkMultiplicity(handler);
 
-publicfinalChannelPipelineaddLast(EventExecutorGroupgroup,Stringname,ChannelHandlerhandler){finalAbstractChannelHandlerContextnewCtx;synchronized(this){checkMultiplicity(handler);newCtx=newContext(group,filterName(name,handler),handler);addLast0(newCtx);//Iftheregisteredisfalseitmeansthatthechannelwasnotregisteredonaneventloopyet.//Inthiscaseweaddthecontexttothepipelineandaddataskthatwillcall//ChannelHandler.handlerAdded(...)oncethechannelisregistered.if(!registered){newCtx.setAddPending();callHandlerCallbackLater(newCtx,true);returnthis;}EventExecutorexecutor=newCtx.executor();if(!executor.inEventLoop()){newCtx.setAddPending();executor.execute(newRunnable(){@Overridepublicvoidrun(){callHandlerAdded0(newCtx);}
+        newCtx = newContext(group, filterName(name, handler), handler);
+        addLast0(newCtx);
+        //If the registered is false it means that the channel was not registered on an eventloop yet.
+        //In this case we add the context to the pipeline and add a task that will call
+        //ChannelHandler.handlerAdded(...) once the channel is registered.
+        if (!registered) {
+            newCtx.setAddPending();
+            callHandlerCallbackLater(newCtx, true);
+            return this;
+        }
 
-
-});returnthis;}}callHandlerAdded0(newCtx);returnthis;}说明1)pipeline添加handler，参数是线程池，name是null，handler是我们或者系统传入的handler。Netty为了防止多个线程导致安全问题，同步了这段代码，步骤如下：2)检查这个handler实例是否是共享的，如果不是，并且已经被别的pipeline使用了，则抛出异常。3)调用newContext(group,filterName(name,handler),handler)方法，创建一个Context。从这里可以看出来了，每次添加一个handler都会创建一个关联Context。4)调用addLast方法，将Context追加到链表中。5)如果这个通道还没有注册到selecor上，就将这个Context添加到这个pipeline的待办任务中。当注册好了以后，就会调用callHandlerAdded0方法（默认是什么都不做，用户可以实现这个方法）。6)到这里，针对三对象创建过程，了解的差不多了，和最初说的一样，每当创建ChannelSocket的时候都会创建一个绑定的pipeline，一对一的关系，创建pipeline的时候也会创建tail节点和head节点，形成最初的链表。tail是入站inbound类型的handler，head既是inbound也是outbound类型的handler。在调用pipeline的addLast方法的时候，会根据给定的handler创建一个Context，然后，将这个Context插入到链表的尾端（tail前面）。到此就OK了
+        EventExecutor executor = newCtx.executor();
+        if (!executor.inEventLoop()) {
+            newCtx.setAddPending();
+            executor.execute(new Runnable() {
+                @Override
+                public void run () {
+                    callHandlerAdded0(newCtx);
+                }
+            });
+            return this;
+        }
+    }
+    callHandlerAdded0(newCtx);
+    return this;
+}
+```
+说明1)pipeline添加handler，参数是线程池，name是null，handler是我们或者系统传入的handler。Netty为了防止多个线程导致安全问题，同步了这段代码，步骤如下：2)检查这个handler实例是否是共享的，如果不是，并且已经被别的pipeline使用了，则抛出异常。3)调用newContext(group,filterName(name,handler),handler)方法，创建一个Context。从这里可以看出来了，每次添加一个handler都会创建一个关联Context。4)调用addLast方法，将Context追加到链表中。5)如果这个通道还没有注册到selecor上，就将这个Context添加到这个pipeline的待办任务中。当注册好了以后，就会调用callHandlerAdded0方法（默认是什么都不做，用户可以实现这个方法）。6)到这里，针对三对象创建过程，了解的差不多了，和最初说的一样，每当创建ChannelSocket的时候都会创建一个绑定的pipeline，一对一的关系，创建pipeline的时候也会创建tail节点和head节点，形成最初的链表。tail是入站inbound类型的handler，head既是inbound也是outbound类型的handler。在调用pipeline的addLast方法的时候，会根据给定的handler创建一个Context，然后，将这个Context插入到链表的尾端（tail前面）。到此就OK了
 
 
 

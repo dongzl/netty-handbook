@@ -114,17 +114,44 @@ public final class EchoServer {
 说明：
 
 1. 先看启动类：`main` 方法中，首先创建了关于 SSL 的配置类。
-2. 重点分析下创建了两个 EventLoopGroup 对象：EventLoopGroup bossGroup = new NioEventLoopGroup(1);EventLoopGroup workerGroup = new NioEventLoopGroup();
-   - (1)这两个对象是整个 Netty 的核心对象，可以说，整个 Netty 的运作都依赖于他们。bossGroup 用于接受 Tcp 请求，他会将请求交给 workerGroup，workerGroup 会获取到真正的连接，然后和连接进行通信，比如读写解码编码等操作。
-   - (2)EventLoopGroup 是事件循环组（线程组）含有多个 EventLoop，可以注册 channel，用于在事件循环中去进行选择（和选择器相关）。[debug看]
-   - (3)new NioEventLoopGroup(1); 这个 1 表示 bossGroup 事件组有 1 个线程你可以指定，如果 new NioEventLoopGroup() 会含有默认个线程 cpu核数 * 2，即可以充分的利用多核的优势，【可以dubug一把】DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt("io.netty.eventLoopThreads",NettyRuntime.availableProcessors()*2));
-   - 会创建 EventExecutor 数组 children = new EventExecutor[nThreads];//debug一下每个元素的类型就是 NIOEventLoop,NIOEventLoop 实现了 EventLoop 接口和 Executor 接口 try 块中创建了一个 ServerBootstrap 对象，他是一个引导类，用于启动服务器和引导整个程序的初始化（看下源码allowseasybootstrapof{@linkServerChannel}）。它和 ServerChannel 关联，而 ServerChannel 继承了 Channel，有一些方法 remoteAddress等[可以Debug下]随后，变量b调用了group方法将两个group放入了自己的字段中，用于后期引导使用【debug下group方法/***Setthe{@linkEventLoopGroup}fortheparent(acceptor)andthechild(client).These*{@linkEventLoopGroup}'sareusedtohandlealltheeventsandIOfor{@linkServerChannel}and*{@linkChannel}'s.*/】。
-   - (4)然后添加了一个channel，其中参数一个Class对象，引导类将通过这个Class对象反射创建ChannelFactory。然后添加了一些TCP的参数。[说明：Channel的创建在bind方法，可以Debug下bind,会找到channel=channelFactory.newChannel();]
-   - (5)再添加了一个服务器专属的日志处理器handler。
-   - (6)再添加一个SocketChannel（不是ServerSocketChannel）的handler。
-   - (7)然后绑定端口并阻塞至连接成功。
-   - (8)最后main线程阻塞等待关闭。
-   - (9)finally块中的代码将在服务器关闭时优雅关闭所有资源
+2. 重点分析下创建了两个 `EventLoopGroup` 对象：
+
+```java
+EventLoopGroup bossGroup = new NioEventLoopGroup(1);
+EventLoopGroup workerGroup = new NioEventLoopGroup();
+```
+
+(1) 这两个对象是整个 `Netty` 的核心对象，可以说，整个 `Netty` 的运作都依赖于他们。`bossGroup` 用于接受 `TCP` 请求，他会将请求交给 `workerGroup`，`workerGroup` 会获取到真正的连接，然后和连接进行通信，比如读写解码编码等操作。
+
+(2) `EventLoopGroup` 是事件循环组（线程组）含有多个 `EventLoop`，可以注册 `channel`，用于在事件循环中去进行选择（和选择器相关）。【debug看】
+
+(3) `new NioEventLoopGroup(1);` 这个 `1` 表示 `bossGroup` 事件组有 `1` 个线程你可以指定，如果 `new NioEventLoopGroup()` 会含有默认个线程 `cpu核数 * 2`，即可以充分的利用多核的优势，【可以dubug一把】
+
+```java
+DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt("io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
+```
+
+会创建 `EventExecutor` 数组 `children = new EventExecutor[nThreads];` // `debug` 一下每个元素的类型就是 `NIOEventLoop`，`NIOEventLoop` 实现了 `EventLoop` 接口和 `Executor` 接口 `try` 块中创建了一个 `ServerBootstrap` 对象，他是一个引导类，用于启动服务器和引导整个程序的初始化（看下源码 `allowseasybootstrapof{@linkServerChannel}`）。它和 `ServerChannel` 关联，而 `ServerChannel` 继承了 `Channel`，有一些方法 `remoteAddress` 等[可以Debug下]随后，变量 `b` 调用了 `group` 方法将两个 `group` 放入了自己的字段中，用于后期引导使用【`debug` 下 `group` 方法
+```java
+/**
+ *Set the {@link EventLoopGroup} for the parent (acceptor) and the child (client) . These
+ *{@link EventLoopGroup}'s are used to handle all the events and IO for {@link ServerChannel} and 
+ *{@link Channel}'s.
+ */
+ ```
+ 】。
+
+(4) 然后添加了一个 `channel`，其中参数一个 `Class` 对象，引导类将通过这个 `Class` 对象反射创建 `ChannelFactory`。然后添加了一些 `TCP` 的参数。【说明：`Channel` 的创建在 `bind` 方法，可以 `Debug` 下 `bind`，会找到 `channel = channelFactory.newChannel();` 】
+
+(5) 再添加了一个服务器专属的日志处理器 `handler` 。
+
+(6) 再添加一个 `SocketChannel`（不是 `ServerSocketChannel`）的 `handler`。
+
+(7) 然后绑定端口并阻塞至连接成功。
+
+(8) 最后 `main` 线程阻塞等待关闭。
+
+(9) `finally` 块中的代码将在服务器关闭时优雅关闭所有资源。
 
 ```java
 
@@ -178,7 +205,7 @@ public class EchoServerHandler extends ChannelInboundHandlerAdapter {
 说明:
 
 1. 这是一个普通的处理器类，用于处理客户端发送来的消息，在我们这里，我们简单的解析出客户端传过来的内容，然后打印，最后发送字符串给客户端。
-2. 大致讲解了我们的demo源码的作用。后面的debug的时候会详细。
+2. 大致讲解了我们的 `demo` 源码的作用。后面的 `debug` 的时候会详细。
 
 **2. 分析 EventLoopGroup 的过程**
 
@@ -191,7 +218,7 @@ public NioEventLoopGroup (int nThreads) {
 }
 ```
 
-2.2 上面的 this(nThreads, (Executor) null); 调用构造器(通过 alt+d 看即可)
+2.2 上面的 `this(nThreads, (Executor) null);` 调用构造器（通过 `alt + d` 看即可）
 
 ```java
 public NioEventLoopGroup (int nThreads, Executor executor) {
@@ -199,7 +226,7 @@ public NioEventLoopGroup (int nThreads, Executor executor) {
 }
 ```
 
-2.3 上面的 this(nThreads,executor,SelectorProvider.provider()); 调用下面构造器
+2.3 上面的 `this(nThreads, executor, SelectorProvider.provider());` 调用下面构造器
 
 ```java
 public NioEventLoopGroup (int nThreads, Executor executor, final SelectorProvider selectorProvider) {
@@ -207,7 +234,7 @@ public NioEventLoopGroup (int nThreads, Executor executor, final SelectorProvide
 }
 ```
 
-2.4 上面的 this()... 调用构造器(alt+d)
+2.4 上面的 `this()...` 调用构造器（`alt + d`）
 
 ```java
 public NioEventLoopGroup (int nThreads, Executor executor, final SelectorProvider selectorProvider,final SelectStrategyFactory selectStrategyFactory) {
@@ -215,7 +242,7 @@ public NioEventLoopGroup (int nThreads, Executor executor, final SelectorProvide
 }
 ```
 
-2.5 上面的super()..的方法是父类：MultithreadEventLoopGroup
+2.5 上面的 `super()..` 的方法是父类：`MultithreadEventLoopGroup`
 
 ```java
 protected MultithreadEventLoopGroup (int nThreads, Executor executor, Object...args) {
@@ -223,16 +250,16 @@ protected MultithreadEventLoopGroup (int nThreads, Executor executor, Object...a
 }
 ```
 
-2.6 追踪到源码抽象类 MultithreadEventExecutorGroup 的构造器方法 MultithreadEventExecutorGroup 才是 NioEventLoopGroup 真正的构造方法，这里可以看成是一个模板方法，使用了设计模式的模板模式(可看我录制视频),所以，我们就需要好好分析 MultithreadEventExecutorGroup 方法了
+2.6 追踪到源码抽象类 `MultithreadEventExecutorGroup` 的构造器方法 `MultithreadEventExecutorGroup` 才是 `NioEventLoopGroup` 真正的构造方法，这里可以看成是一个模板方法，使用了设计模式的模板模式（可看我录制视频），所以，我们就需要好好分析 `MultithreadEventExecutorGroup` 方法了
 
-2.7 分析 MultithreadEventExecutorGroup
+2.7 分析 `MultithreadEventExecutorGroup`
 
 参数说明：
 
-- @param nThreads 使用的线程数，默认为 core*2[可以追踪源码]
-- @param executor 执行器:如果传入 null, 则采用 Netty 默认的线程工厂和默认的执行器 ThreadPerTaskExecutor
-- @param chooserFactory 单例 new DefaultEventExecutorChooserFactory()
-- @param args args在创建执行器的时候传入固定参数
+- `@param nThreads` 使用的线程数，默认为 `core * 2`【可以追踪源码】
+- `@param executor` 执行器:如果传入 `null`, 则采用 `Netty` 默认的线程工厂和默认的执行器 `ThreadPerTaskExecutor`
+- `@param chooserFactory` 单例 `new DefaultEventExecutorChooserFactory()`
+- `@param args args` 在创建执行器的时候传入固定参数
 
 ```java
 
@@ -307,16 +334,16 @@ protected MultithreadEventExecutorGroup(int nThreads, Executor executor,
 
 说明：
 
-1. 如果 executor 是 null，创建一个默认的 ThreadPerTaskExecutor，使用 Netty 默认的线程工厂。
-2. 根据传入的线程数（CPU*2）创建一个线程池（单例线程池）数组。
+1. 如果 `executor` 是 `null`，创建一个默认的 `ThreadPerTaskExecutor`，使用 `Netty` 默认的线程工厂。
+2. 根据传入的线程数（`CPU * 2`）创建一个线程池（单例线程池）数组。
 3. 循环填充数组中的元素。如果异常，则关闭所有的单例线程池。
 4. 根据线程选择工厂创建一个线程选择器。
 5. 为每一个单例线程池添加一个关闭监听器。
-6. 将所有的单例线程池添加到一个 HashSet 中。
+6. 将所有的单例线程池添加到一个 `HashSet` 中。
 
 **3. ServerBootstrap 创建和构造过程**
    
-3.1 ServerBootstrap 是个空构造，但是有默认的成员变量
+3.1 `ServerBootstrap` 是个空构造，但是有默认的成员变量
 
 ```java
 
@@ -330,7 +357,7 @@ private volatile ChannelHandler childHandler;
 
 ```
 
-3.2 分析一下 ServerBootstrap 基本使用情况
+3.2 分析一下 `ServerBootstrap` 基本使用情况
 
 ```java
 
@@ -354,16 +381,16 @@ b.group(bossGroup, workerGroup)
 ```
 
 说明:
-1. 链式调用：group 方法，将 boss 和 worker 传入，boss 赋值给 parentGroup 属性, worker 赋值给 childGroup 属性
-2. channel方法传入NioServerSocketChannelclass对象。会根据这个class创建channel对象。
-3. option方法传入TCP参数，放在一个LinkedHashMap中。
-4. handler方法传入一个handler中，这个hanlder只专属于ServerSocketChannel而不是SocketChannel
-5. childHandler传入一个hanlder，这个handler将会在每个客户端连接的时候调用。供SocketChannel使用
+1. 链式调用：`group` 方法，将 `boss` 和 `worker` 传入，`boss` 赋值给 `parentGroup` 属性, `worker` 赋值给 `childGroup` 属性。
+2. `channel` 方法传入 `NioServerSocketChannelclass` 对象。会根据这个 `class` 创建 `channel` 对象。
+3. `option` 方法传入 `TCP` 参数，放在一个 `LinkedHashMap` 中。
+4. `handler` 方法传入一个 `handler` 中，这个 `hanlder` 只专属于 `ServerSocketChannel` 而不是 `SocketChannel`。
+5. `childHandler` 传入一个 `hanlder`，这个 `handler` 将会在每个客户端连接的时候调用。供 `SocketChannel` 使用。
 
 **4. 绑定端口的分析**
 
-4.1 服务器就是在这个bind方法里启动完成的
-4.2 bind方法代码,追踪到创建了一个端口对象，并做了一些空判断，核心代码doBind,我们看看
+4.1 服务器就是在这个 `bind` 方法里启动完成的
+4.2 `bind` 方法代码,追踪到创建了一个端口对象，并做了一些空判断，核心代码 `doBind`，我们看看
 
 ```java
 
@@ -376,7 +403,7 @@ public ChannelFuture bind(SocketAddress localAddress) {
 }
 ```
 
-4.3 doBind 源码剖析,核心是两个方法 initAndRegister 和 doBind0
+4.3 `doBind` 源码剖析，核心是两个方法 `initAndRegister` 和 `doBind0`
 
 ```java
 private ChannelFuture doBind(final SocketAddress localAddress) {
@@ -419,7 +446,7 @@ private ChannelFuture doBind(final SocketAddress localAddress) {
 }
 ```
 
-4.4 分析说明 initAndRegister
+4.4 分析说明 `initAndRegister`
 
 ```java
 final ChannelFuture initAndRegister() {
@@ -428,21 +455,20 @@ final ChannelFuture initAndRegister() {
         channel = channelFactory.newChannel();
 
         /**
-         说明：channelFactory.newChannel() 方法的作用通过 ServerBootstrap 的通道工厂反射创建一个 NioServerSocketChannel,具体追踪源码可以得到下面结论
+         * 说明：channelFactory.newChannel() 方法的作用通过 ServerBootstrap 的通道工厂反射创建一个 NioServerSocketChannel,具体追踪源码可以得到下面结论
+         * (1)通过 NIO 的 SelectorProvider 的 openServerSocketChannel 方法得到 JDK 的 channel。目的是让 Netty 包装 JDK 的 channel。
+         * (2)创建了一个唯一的 ChannelId，创建了一个 NioMessageUnsafe，用于操作消息，创建了一个 DefaultChannelPipeline 管道，是个双向链表结构，用于过滤所有的进出的消息。
+         * (3)创建了一个 NioServerSocketChannelConfig 对象，用于对外展示一些配置。 
+         
+         * channel = channelFactory.newChannel();//NioServerSocketChannel
 
-         (1)通过 NIO 的 SelectorProvider 的 openServerSocketChannel 方法得到 JDK 的 channel。目的是让 Netty 包装 JDK 的 channel。
-         (2)创建了一个唯一的 ChannelId，创建了一个 NioMessageUnsafe，用于操作消息，创建了一个 DefaultChannelPipeline 管道，是个双向链表结构，用于过滤所有的进出的消息。
-         (3)创建了一个 NioServerSocketChannelConfig 对象，用于对外展示一些配置。 
-         channel = channelFactory.newChannel();//NioServerSocketChannel
-
-         说明：init 初始化这个 NioServerSocketChannel，具体追踪源码可以得到如下结论
-
-         (1) init 方法，这是个抽象方法 (AbstractBootstrap类的），由ServerBootstrap实现（可以追一下源码//setChannelOptions(channel,options,logger);）。
-         (2)设置 NioServerSocketChannel 的 TCP 属性。
-         (3)由于 LinkedHashMap 是非线程安全的，使用同步进行处理。
-         (4)对 NioServerSocketChannel 的 ChannelPipeline 添加 ChannelInitializer 处理器。
-         (5)可以看出，init 的方法的核心作用在和 ChannelPipeline 相关。
-         (6)从 NioServerSocketChannel 的初始化过程中，我们知道，pipeline 是一个双向链表，并且，他本身就初始化了 head 和 tail，这里调用了他的 addLast 方法，也就是将整个 handler 插入到 tail 的前面，因为 tail 永远会在后面，需要做一些系统的固定工作。
+         * 说明：init 初始化这个 NioServerSocketChannel，具体追踪源码可以得到如下结论
+         * (1) init 方法，这是个抽象方法 (AbstractBootstrap类的），由ServerBootstrap实现（可以追一下源码//setChannelOptions(channel,options,logger);）。
+         * (2)设置 NioServerSocketChannel 的 TCP 属性。
+         * (3)由于 LinkedHashMap 是非线程安全的，使用同步进行处理。
+         * (4)对 NioServerSocketChannel 的 ChannelPipeline 添加 ChannelInitializer 处理器。
+         * (5)可以看出，init 的方法的核心作用在和 ChannelPipeline 相关。
+         * (6)从 NioServerSocketChannel 的初始化过程中，我们知道，pipeline 是一个双向链表，并且，他本身就初始化了 head 和 tail，这里调用了他的 addLast 方法，也就是将整个 handler 插入到 tail 的前面，因为 tail 永远会在后面，需要做一些系统的固定工作。
          */
         init(channel);
     } catch (Throwable t) {
@@ -466,13 +492,13 @@ final ChannelFuture initAndRegister() {
 ```
 
 说明：
-1. 基本说明：initAndRegister() 初始化 NioServerSocketChannel 通道并注册各个 handler，返回一个 future
-2. 通过 ServerBootstrap 的通道工厂反射创建一个 NioServerSocketChannel。
-3. init 初始化这个 NioServerSocketChannel。
-4. config().group().register(channel) 通过 ServerBootstrap 的 bossGroup 注册 NioServerSocketChannel。
-5. 最后，返回这个异步执行的占位符即 regFuture。
+1. 基本说明：`initAndRegister()` 初始化 `NioServerSocketChannel` 通道并注册各个 `handler`，返回一个 `future`。
+2. 通过 `ServerBootstrap` 的通道工厂反射创建一个 `NioServerSocketChannel`。
+3. `init` 初始化这个 `NioServerSocketChannel`。
+4. `config().group().register(channel)` 通过 `ServerBootstrap` 的 `bossGroup` 注册 `NioServerSocketChannel`。
+5. 最后，返回这个异步执行的占位符即 `regFuture`。
 
-4.5 init 方法会调用 addLast，现在进入到 addLast 方法内查看
+4.5 `init` 方法会调用 `addLast`，现在进入到 `addLast` 方法内查看
 
 ```java
 @Override

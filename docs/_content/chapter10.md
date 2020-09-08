@@ -857,7 +857,7 @@ protected void doBeginRead() throws Exception {
 3)每一个 `ChannelPipeline` 内部都含有多个 `ChannelHandlerContext`（以下简称 `Context`）
 4)他们一起组成了双向链表，这些 `Context` 用于包装我们调用 `addLast` 方法时添加的 `ChannelHandler`（以下简称 `handler`）
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_02.png)
 
 1)上图中：`ChannelSocket` 和 `ChannelPipeline` 是一对一的关联关系，而 `pipeline` 内部的多个 `Context` 形成了链表，`Context` 只是对 `Handler` 的封装。
 2)当一个请求进来的时候，会进入 `Socket` 对应的 `pipeline`，并经过 `pipeline` 所有的 `handler`，对，就是设计模式中的过滤器模式。
@@ -866,17 +866,17 @@ protected void doBeginRead() throws Exception {
 
 1)`pipeline` 的接口设计
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_03.png)
 
 部分源码
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_04.png)
 
 可以看到该接口继承了 `inBound`，`outBound`，`Iterable` 接口，表示他可以调用数据出站的方法和入站的方法，同时也能遍历内部的链表，看看他的几个代表性的方法，基本上都是针对 `handler` 链表的插入，追加，删除，替换操作，类似是一个 `LinkedList`。同时，也能返回 `channel`（也就是 `socket`）
 
 1)在 `pipeline` 的接口文档上，提供了一幅图
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_05.png)
 
 对上图的解释说明：
 *这是一个 `handler` 的 `list`，`handler` 用于处理或拦截入站事件和出站事件，`pipeline` 实现了过滤器的高级形式，以便用户控制事件如何处理以及 `handler` 在 `pipeline` 中如何交互。
@@ -914,7 +914,7 @@ public interface ChannelHandler {
 
 2)`ChannelInboundHandler` 入站事件接口
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_06.png)
 
 *`channelActive` 用于当 `Channel` 处于活动状态时被调用；
 
@@ -924,7 +924,7 @@ public interface ChannelHandler {
 
 3)`ChannelOutboundHandler 出站事件接口
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_07.png)
 
 *`bind` 方法，当请求将 `Channel` 绑定到本地地址时调用
 
@@ -934,7 +934,7 @@ public interface ChannelHandler {
 
 4)`ChannelDuplexHandler` 处理出站和入站事件
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_08.png)
 
 *`ChannelDuplexHandler` 间接实现了入站接口并直接实现了出站接口。
 
@@ -944,21 +944,21 @@ public interface ChannelHandler {
 
 1)`ChannelHandlerContext` `UML` 图
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_09.png)
 
 `ChannelHandlerContext` 继承了出站方法调用接口和入站方法调用接口
 
 1)`ChannelOutboundInvoker` 和 `ChannelInboundInvoker` 部分源码
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_10.png)
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_11.png)
 
 *这两个 `invoker` 就是针对入站或出站方法来的，就是在入站或出站 `handler` 的外层再包装一层，达到在方法前后拦截并做一些特定操作的目的
 
 2)`ChannelHandlerContext` 部分源码
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_12.png)
 
 *`ChannelHandlerContext` 不仅仅时继承了他们两个的方法，同时也定义了一些自己的方法
 
@@ -1226,7 +1226,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
 4.关于如何调度，用一张图来表示:
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_13.png)
 
 说明：
 1)`pipeline` 首先会调用 `Context` 的静态方法 `fireXXX`，并传入 `Context`
@@ -1252,7 +1252,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
 如图
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_14.png)
 
 源码剖析：
 
@@ -1262,7 +1262,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
 2)如图
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_15.png)
 
 3)`ReadTimeout` 事件和 `WriteTimeout` 事件都会自动关闭连接，而且，属于异常处理，所以，这里只是介绍以下，我们重点看 `IdleStateHandler`。
 
@@ -1318,7 +1318,7 @@ private void initialize(ChannelHandlerContext ctx) {
 
 6.3该类内部的 `3` 个定时任务类
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_16.png)
 
 1)这 `3` 个定时任务分别对应读，写，读或者写事件。共有一个父类（`AbstractIdleTask`）。这个父类提供了一个模板方法
 
@@ -1498,7 +1498,7 @@ if(!reading) {
 1.`EventLoop`介绍
 1.1首先看看 `NioEventLoop` 的继承图
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_17.png)
 
 说明重点：
 1)`ScheduledExecutorService` 接口表示是一个定时任务接口，`EventLoop` 可以接受定时任务。
@@ -1510,7 +1510,7 @@ if(!reading) {
 
 2.1 `execute` 源码剖析
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_18.png)
 
 在 `EventLoop` 的使用，一般就是 `eventloop.execute(task);` 看下 `execute` 方法的实现(在 `SingleThreadEventExecutor` 类中)
 
@@ -1855,7 +1855,7 @@ public class EchoServerHandler extends ChannelInboundHandlerAdapter {
 
 11.2这样处理之后，整个程序的逻辑如图
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+![](../_media/chapter10/chapter10_19.png)
 
 说明：
 

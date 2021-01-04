@@ -6,6 +6,10 @@
 - 掌握 Java 的面向对象编程、多线程编程、IO 编程、网络编程等知识
 - 《Netty 核心源码剖析章节》内容学习最好有项目开发和阅读源码的经历
 
+[![stars](https://badgen.net/github/stars/dongzl/netty-handbook?icon=github&color=4ab8a1)](https://github.com/dongzl/netty-handbook) 
+[![forks](https://badgen.net/github/forks/dongzl/netty-handbook?icon=github&color=4ab8a1)](https://github.com/dongzl/netty-handbook)
+[![License](https://img.shields.io/badge/license-Apache%202-4EB1BA.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
+
 # 内容介绍
 
 本网站内容是根据韩顺平老师在尚硅谷开设的 Netty 学习课程《尚硅谷 Netty 视频教程》整理而来，所有内容、图片版权归尚硅谷和韩顺平老师所有，本人只是对其中部分文本、代码进行格式美化工作，对于其中部分图片内容，依照原始图片使用 processon 工具进行重新制作，版权所有，请勿用于商业目的。

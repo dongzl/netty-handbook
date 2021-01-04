@@ -1,5 +1,3 @@
-<div style="align:center">
-
 ![](https://dongzl.github.io/netty-handbook/_media/netty_logo_450px.svg)
 
 [![stars](https://badgen.net/github/stars/dongzl/netty-handbook?icon=github&color=4ab8a1)](https://github.com/dongzl/netty-handbook) 
@@ -11,8 +9,6 @@
 - 本课程不适合零基础的学员，需要掌握常用的设计模式和数据结构
 - 掌握 Java 的面向对象编程、多线程编程、IO 编程、网络编程等知识
 - 《Netty 核心源码剖析章节》内容学习最好有项目开发和阅读源码的经历
-
-</div>
 
 # 内容介绍
 

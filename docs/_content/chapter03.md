@@ -514,6 +514,8 @@ public class ScatteringAndGatheringTest {
 
 `NIO` 非阻塞网络编程相关的（`Selector`、`SelectionKey`、`ServerScoketChannel` 和 `SocketChannel`）关系梳理图
 
+![](../_media/chapter03/chapter03_22.png)
+
 对上图的说明：
 
 1. 当客户端连接时，会通过 `ServerSocketChannel` 得到 `SocketChannel`。

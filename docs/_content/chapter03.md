@@ -450,7 +450,7 @@ public class ScatteringAndGatheringTest {
 
             while (byteRead < messageLength) {
                 long l = socketChannel.read(byteBuffers);
-                byteRead += 1; //累计读取的字节数
+                byteRead += l; //累计读取的字节数
                 System.out.println("byteRead = " + byteRead);
                 //使用流打印,看看当前的这个 buffer 的 position 和 limit
                 Arrays.asList(byteBuffers).stream().map(buffer -> "position = " + buffer.position() + ", limit = " + buffer.limit()).forEach(System.out::println);

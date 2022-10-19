@@ -11,4 +11,4 @@
 -->
 
 * [LeetCode Cookbook](https://books.halfrost.com/leetcode/)
-* [算法小抄](https://labuladong.gitbook.io/algo/)
+* [算法小抄](https://labuladong.github.io/algo/)
